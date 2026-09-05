@@ -61,7 +61,7 @@ C4Container
     ContainerDb(invoiceDb, "Invoice DB", "PostgreSQL 16", "epod_records, invoices")
     ContainerDb(paymentDb, "Payment DB", "PostgreSQL 16", "transactional_outbox, idempotency_records")
     ContainerDb(reconDb, "Recon DB", "PostgreSQL 16", "bank_statements, bank_statement_lines")
-    ContainerQueue(kafka, "Apache Kafka", "Message Broker", "smartpay.events.* (epod-verified, invoice-issued, payment-settled, ledger-posted)")
+    ContainerQueue(kafka, "Redpanda / Kafka", "Kafka Wire Protocol", "smartpay.events.* (epod-verified, invoice-issued, payment-settled, ledger-posted)")
 
     Rel(client, gateway, "API istekleri", "HTTPS / JSON")
     Rel(gateway, invoiceService, "Fatura & ePOD çağrıları", "HTTP / REST")

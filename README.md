@@ -20,7 +20,7 @@ Platformun tüm mimari kararları, diyagramları ve geliştirici hikayeleri `doc
 * 🔄 [**Sıralama Diyagramları (Sequence Diagrams)**](docs/architecture/sequence-diagrams.md)
 * 👥 [**Kullanım Senaryosu Diyagramları (Use Case Diagrams)**](docs/architecture/usecase-diagrams.md)
 * 📘 [**gRPC & Protobuf Teknik Kılavuzu**](docs/architecture/grpc-technical-guide.md)
-* 📜 [**Mimari Karar Kayıtları (ADR-001 - ADR-006)**](docs/decisions/README.md)
+* 📜 [**Mimari Karar Kayıtları (ADR-001 - ADR-007)**](docs/decisions/README.md)
 * 📑 [**OpenAPI 3.1 REST Spesifikasyonları**](docs/openapi/README.md)
 * 📋 [**Geliştirici Hikaye Kartları (STORY-001 - STORY-006)**](docs/stories/README.md)
 * ⚠️ [**Teknik Borç Kayıtları (TD-001: Currency Master)**](docs/tech-debt/TD-001-currency-definitions-master-table.md)
@@ -40,8 +40,8 @@ Platformun tüm mimari kararları, diyagramları ve geliştirici hikayeleri `doc
 | **Notification Svc** | `smartpay-notification-service`| `8086` | `9096` | `smartpay_db` | Olay odaklı e-posta / SMS bildirim motoru |
 | **Payout Worker** | `smartpay-payout-worker` | `8087` | — | `smartpay_db` | Sanal thread (Virtual Thread) faktoring ödeme arka plan işçisi |
 | **PostgreSQL** | `postgres` | `5432` | — | `smartpay_db` | Birincil ilişkisel ACID veritabanı (B-Tree UUIDv7) |
-| **Apache Kafka** | `kafka` | `9092` | — | — | Dağıtık olay veri yolu (EDA - Event-Driven Architecture) |
-| **Kafka UI** | `kafka-ui` | `8090` | — | — | Kafka topic ve mesaj izleme web paneli |
+| **Redpanda (Kafka API)** | `redpanda` | `9092` | — | — | Hafif C++20 motorlu, yerel Kafka uyumlu olay veri yolu (ADR-007) |
+| **Redpanda Console** | `redpanda-console` | `8090` | — | — | Redpanda topic ve mesaj izleme web paneli (`http://localhost:8090`) |
 
 ---
 
@@ -69,7 +69,7 @@ Platformun tüm mimari kararları, diyagramları ve geliştirici hikayeleri `doc
 ---
 
 ### 2. Altyapıyı Ayağa Kaldırma (Docker Compose)
-PostgreSQL 16, Apache Kafka ve Kafka UI servislerini başlatın:
+PostgreSQL 16, Redpanda (hafif Kafka motoru) ve Redpanda Console servislerini başlatın:
 ```bash
 docker compose up -d
 ```
@@ -79,8 +79,8 @@ Konteynerlerin sağlık durumunu doğrulayın:
 docker compose ps
 ```
 * **PostgreSQL**: `localhost:5432` (Kullanıcı: `smartpay_admin`, Şifre: `smartpay_secret`, DB: `smartpay_db`)
-* **Kafka**: `localhost:9092`
-* **Kafka UI Web Paneli**: Tarayıcıda `http://localhost:8090`
+* **Redpanda (Kafka API)**: `localhost:9092` (Spring Boot doğrudan bağlanır)
+* **Redpanda Console Web Paneli**: Tarayıcıda `http://localhost:8090`
 
 ---
 

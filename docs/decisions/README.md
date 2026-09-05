@@ -14,3 +14,4 @@ Bu dizin, SmartPay platformunun inşasında alınan temel teknik ve mimari karar
 | [**ADR-004**](ADR-004-grpc-internal-service-communication.md) | İç Servisler Arası İletişimde gRPC (HTTP/2) Kullanımı | **KABUL EDİLDİ** | 2026-09-05 |
 | [**ADR-005**](ADR-005-transactional-outbox-event-driven.md) | Dağıtık Olaylar İçin PostgreSQL SKIP LOCKED Transactional Outbox | **KABUL EDİLDİ** | 2026-09-05 |
 | [**ADR-006**](ADR-006-two-tier-distributed-idempotency.md) | SHA-256 İstek Parmak İzi ile İki Katmanlı Dağıtık Idempotency | **KABUL EDİLDİ** | 2026-09-05 |
+| [**ADR-007**](ADR-007-redpanda-for-local-development.md) | Yerel Geliştirme ve Testlerde Redpanda (Kafka Uyumlu) Kullanımı | **KABUL EDİLDİ** | 2026-09-05 |
