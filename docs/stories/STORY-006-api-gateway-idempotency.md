@@ -1,64 +1,64 @@
-# STORY-006: API Gateway & Dağıtık Idempotency Filtresi
+# STORY-006: API Gateway & Distributed Idempotency Filter
 
-## 📌 Genel Bakış
-* **Hedef Modül**: `smartpay-gateway`
-* **Öncelik**: P2 (Sistem Giriş Kapısı & Güvenlik)
-* **İlişkili Veritabanı Tabloları**: `idempotency_records` (`V5`)
-* **Kullanılacak `smartpay-common` Bileşenleri**:
-  * `TenantId`, `IdempotencyKey`
+## 📌 Overview
+* **Target Module**: `smartpay-gateway`
+* **Priority**: P2 (Ingress Security & Edge Filtering)
+* **Associated Database Tables**: `idempotency_records` (`V5`)
+* **Required `smartpay-common` Components**:
+  * `TenantId`, `IdempotencyKey` (Strongly-typed IDs)
   * `IdempotencyStatus`
   * `IdempotencyConflictException`, `RequestHashMismatchException`
 
 ---
 
-## 🎯 Kullanıcı Hikayesi
-> **Bir** API Gateway olarak,  
-> **Dış dünyadan gelen finansal HTTP isteklerini** (POST/PUT) `Idempotency-Key` başlığı ve SHA-256 gövde parmak iziyle karşılamak,  
-> **Böylece** ağ gecikmesi veya istemci tarafındaki yeniden denemelerde (retry) arka uç servislerinin mükerrer tetiklenmesini en dış sınırda engellemek istiyorum.
+## 🎯 User Story
+> **As the** API Gateway,  
+> **I want to** inspect incoming financial HTTP requests (POST/PUT) for mandatory `Idempotency-Key` headers and compute SHA-256 body fingerprints,  
+> **So that** network retries and duplicate submissions are intercepted at the perimeter before triggering backend service workloads.
 
 ---
 
-## 📐 Mimari ve Filtre Kuralları
+## 📐 Architecture & Filter Invariants
 
-1. **Header Kontrolü**:
-   * Finansal işlem isteklerinde (`/api/v1/payments/**`, `/api/v1/invoices/**`) `Idempotency-Key` başlığı zorunludur.
-   * Başlık yoksa HTTP 400 Bad Request dönülmelidir.
+1. **Header Enforcement**:
+   * Financial mutation endpoints (`/api/v1/payments/**`, `/api/v1/invoices/**`) mandate the `Idempotency-Key` HTTP header.
+   * Requests lacking this header are rejected immediately with HTTP 400 Bad Request.
 
-2. **Gövde Parmak İzi (Fingerprinting)**:
-   * Gelen JSON gövdesi SHA-256 ile özetlenir (`request_hash`).
-   * Aynı anahtar ile farklı bir gövde gönderilirse `RequestHashMismatchException` (HTTP 422) verilir.
+2. **Request Fingerprinting**:
+   * The JSON body is hashed with SHA-256 (`request_hash`).
+   * A request bearing a reused key but a mutated body is rejected with `RequestHashMismatchException` (HTTP 422).
 
-3. **Response Caching**:
-   * Arka uç servisinden dönen HTTP status kodu ve JSON gövdesi `idempotency_records` tablosuna yazılır. Sonraki aynı isteklerde doğrudan bu kaydedilen yanıt dönülür.
-
----
-
-## ✅ Kabul Kriterleri (Acceptance Criteria)
-
-### AC-1: Eksik Başlık Reddi
-* **Given**: `Idempotency-Key` başlığı içermeyen bir ödeme isteği geldiğinde,
-* **When**: Gateway filtre çalıştığında,
-* **Then**: İstek arka uç servisine iletilmemeli, HTTP 400 Bad Request dönmelidir.
-
-### AC-2: Başarılı İstek Önbelleklemesi
-* **Given**: İlk kez gelen geçerli bir ödeme isteğinde,
-* **When**: Arka uç servisi 201 Created döndüğünde,
-* **Then**: Gateway yanıtı `idempotency_records` tablosuna `COMPLETED` olarak kaydetmeli ve istemciye iletmelidir.
-
-### AC-3: Mükerrer İstekte Anında Yanıt
-* **Given**: Aynı anahtar ve aynı gövdeyle ikinci bir istek geldiğinde,
-* **When**: Gateway filtre çalıştığında,
-* **Then**: Arka uç servisi hiç çağrılmamalı, veritabanındaki kayıtlı yanıt HTTP başlıklarına `X-Cache: IDEMPOTENT-HIT` eklenerek dönmelidir.
+3. **Perimeter Response Caching**:
+   * Upstream HTTP status codes and responses are cached in `idempotency_records`. Replayed requests receive the cached response directly with header `X-Cache: IDEMPOTENT-HIT`.
 
 ---
 
-## 💻 Geliştirilecek Sınıflar Rehberi
+## ✅ Acceptance Criteria (AC)
+
+### AC-1: Missing Header Rejection
+* **Given**: A payment request submitted without an `Idempotency-Key` header,
+* **When**: The gateway filter processes the request,
+* **Then**: The request is aborted before reaching downstream services, returning HTTP 400 Bad Request.
+
+### AC-2: Response Caching on First Success
+* **Given**: A novel, valid payment request,
+* **When**: The downstream service responds with HTTP 201 Created,
+* **Then**: The gateway caches the status code and response payload in `idempotency_records` (`status = COMPLETED`).
+
+### AC-3: Instant Perimeter Response on Retries
+* **Given**: An incoming request matching a previously completed key and body hash,
+* **When**: The gateway filter executes,
+* **Then**: Downstream services are bypassed completely, and the cached response is served with header `X-Cache: IDEMPOTENT-HIT`.
+
+---
+
+## 💻 Class Implementation Structure
 
 ```
 smartpay-gateway/src/main/java/com/hozgan/smartpay/gateway/
 ├── filter/
-│   ├── IdempotencyGatewayFilter.java   // Servlet / WebFilter filtresi
-│   └── RequestCachingWrapper.java      // Gövdeyi birden fazla okuyabilmek için wrapper
+│   ├── IdempotencyGatewayFilter.java   // Servlet / WebFilter filter implementation
+│   └── RequestCachingWrapper.java      // Multi-read cached HTTP request wrapper
 └── service/
-    └── GatewayIdempotencyService.java  // Veritabanı okuma/yazma servis katmanı
+    └── GatewayIdempotencyService.java  // Database lock and cache persistence service
 ```

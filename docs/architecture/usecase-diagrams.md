@@ -1,53 +1,53 @@
-# Kullanım Senaryosu Diyagramları (Use Case Diagrams)
+# Use Case Diagrams
 
-Bu doküman, SmartPay platformundaki farklı aktörlerin sistemle gerçekleştirdiği kullanım senaryolarını görselleştirir.
-
----
-
-## 1. Aktörler (Actors)
-
-* 🏢 **Yük Veren (Shipper)**: Yük ilanı veren, navlun sözleşmesi yapan ve faturaları ödeyen kurumsal lojistik müşterisi.
-* 🚚 **Taşıyıcı / Nakliyeci (Carrier)**: Navlunu taşıyan, teslimat kanıtı (ePOD) sunan ve erken ödeme (Factoring) talep eden aktör.
-* 👔 **Finans Operatörü (Financial Operations Admin)**: Platform bakiyelerini, mutabakat farklarını ve muhasebe denetimini yöneten yetkili.
-* 🤖 **Otomatik Sistem / Arka Plan İşçisi (Automated Workers)**: Outbox publisher, faktoring scheduler ve periyodik mutabakat botları.
-* 🏦 **Banka & Ödeme Takas Rayları (Banking Rails)**: Faster Payments, Open Banking VRP ve ClearBank/Barclays sistemleri.
+This document visualizes the primary interactions between external actors and the SmartPay Logistics Payment Platform.
 
 ---
 
-## 2. Kullanım Senaryoları Şeması
+## 1. Primary Actors
+
+* 🏢 **Shipper (Freight Customer)**: Creates freight transport orders, reviews itemized invoices, deposits funds into escrow, and approves final settlements.
+* 🚚 **Carrier / Driver**: Transports loads, uploads Electronic Proof of Delivery (ePOD) with GPS coordinates and cryptographic signatures, and requests instant factoring liquidity.
+* 👔 **Finance Operations Administrator**: Monitors double-entry ledger health, uploads ISO-20022 bank statements, investigates discrepancies, and reconciles statements.
+* 🤖 **System Background Workers**: Automated workers handling transactional outbox event publishing, factoring eligibility polling, and scheduled reconciliation.
+* 🏦 **Banking & Payment Rails**: External clearing systems including Faster Payments, Open Banking Variable Recurring Payments (VRP), and ClearBank/Barclays partner APIs.
+
+---
+
+## 2. Platform Use Case Map
 
 ```mermaid
 graph LR
-    subgraph Actors[Aktörler]
-        Shipper((Yük Veren))
-        Carrier((Taşıyıcı))
-        FinOps((Finans Operatörü))
-        BankWorker((Arka Plan Worker))
+    subgraph Actors[Actors]
+        Shipper((Shipper))
+        Carrier((Carrier))
+        FinOps((Finance Ops))
+        BankWorker((Background Worker))
     end
 
-    subgraph InvoicingContext[Faturalama & ePOD]
-        UC_UploadEpod[ePOD Teslimat Kanıtı Yükle]
-        UC_CalculateInvoice[Dinamik Navlun Faturası Hesapla]
-        UC_ApproveInvoice[Fatura Onayla]
+    subgraph InvoicingContext[Invoicing & ePOD Context]
+        UC_UploadEpod[Upload Delivery Proof ePOD]
+        UC_CalculateInvoice[Calculate Freight Pricing]
+        UC_ApproveInvoice[Approve Freight Invoice]
     end
 
-    subgraph LedgerContext[Defter-i Kebir]
-        UC_DoubleEntry[Çift Taraflı Fiş Kes]
-        UC_HoldFunds[Bakiyeye Bloke Koy]
-        UC_ReleaseHold[Bloke Çöz / Tahsil Et]
-        UC_AuditLedger[Denetim İzini Görüntüle]
+    subgraph LedgerContext[General Ledger Context]
+        UC_DoubleEntry[Post Zero-Sum Journal Entry]
+        UC_HoldFunds[Reserve Balance Hold]
+        UC_ReleaseHold[Release / Capture Hold]
+        UC_AuditLedger[Audit Accounting Trail]
     end
 
-    subgraph PaymentContext[Ödeme & Faktoring]
-        UC_RequestFactoring[Erken Ödeme Faktoring Talep Et]
-        UC_ExecutePayout[Taşımacıya Anında Ödeme Yap]
-        UC_InitiateVrp[VRP / Faster Payments Başlat]
+    subgraph PaymentContext[Payment & Factoring Context]
+        UC_RequestFactoring[Request Factoring Liquidity]
+        UC_ExecutePayout[Disburse Carrier Payout]
+        UC_InitiateVrp[Initiate VRP / Faster Payment]
     end
 
-    subgraph ReconContext[Banka Mutabakatı]
-        UC_UploadCamt[CAMT.053 XML Ekstresi Yükle]
-        UC_AutoMatch[EndToEndId ile Otomatik Eşle]
-        UC_ResolveDiscrepancy[Uyuşmazlık Çöz]
+    subgraph ReconContext[Reconciliation Context]
+        UC_UploadCamt[Upload CAMT.053 Statement XML]
+        UC_AutoMatch[Match Lines via EndToEndId]
+        UC_ResolveDiscrepancy[Resolve Statement Discrepancy]
     end
 
     Carrier --> UC_UploadEpod
@@ -68,28 +68,28 @@ graph LR
 
 ---
 
-## 3. Detaylı Senaryo Açıklamaları
+## 3. Detailed Use Case Specifications
 
-### A) Taşıyıcı Senaryoları (Carrier Use Cases)
-1. **ePOD Teslimat Kanıtı Yükle**:
-   * Sürücü teslimat adresinde yükün fotoğrafını çeker, müşteri imzasını alır ve mobil uygulama üzerinden `latitude`, `longitude`, `signature_hash` ve fotoğrafı gönderir.
-2. **Erken Ödeme (Factoring) Talep Et**:
-   * Teslimat onaylandığında faturanın vadesini (30-90 gün) beklemek istemeyen taşımacı, tek tuşla %2.5 platform komisyonu karşılığında erken ödeme talep eder.
+### A) Carrier Scenarios
+1. **Upload Delivery Proof (ePOD)**:
+   * Sürücü captures delivery photo, collects recipient signature, and submits `latitude`, `longitude`, `signature_hash`, and S3 photo link via mobile client.
+2. **Request Instant Factoring Liquidity**:
+   * Upon delivery verification, carrier bypasses standard 30-90 day net payment terms and requests instant disbursement with a 2.5% platform fee deduction.
 
-### B) Yük Veren Senaryoları (Shipper Use Cases)
-1. **Navlun Faturasını Onayla**:
-   * Yük veren, mesafeye ve araç tipine göre otomatik hesaplanmış faturayı görüntüler, onaylar ve platform emanet (escrow) hesabına para yatırır.
-2. **Open Banking VRP ile Ödeme Yap**:
-   * Yük veren, banka kartı komisyonlarından kaçınmak için Variable Recurring Payment (VRP) ile doğrudan banka hesabından transfer başlatır.
+### B) Shipper Scenarios
+1. **Approve Freight Invoice**:
+   * Shipper reviews the itemized invoice (base rate, fuel surcharge, VAT) calculated from mileage and vehicle type, authorizing payment from escrow.
+2. **Initiate Open Banking VRP**:
+   * Shipper funds platform accounts or pays freight bills directly via Variable Recurring Payments (VRP) to avoid merchant card interchange fees.
 
-### C) Finans Operatörü Senaryoları (FinOps Use Cases)
-1. **Banka Ekstresi (CAMT.053 / MT940) Yükle**:
-   * Bankadan periyodik indirilen ISO-20022 XML ekstreleri sisteme yüklenir.
-2. **Uyuşmazlıkları Çöz (Discrepancy Resolution)**:
-   * Banka komisyonu veya hesap numarası uyumsuzluğu nedeniyle otomatik eşleşmeyen satırlar manuel olarak incelenir ve düzeltme fişi kesilir.
+### C) Finance Operations Scenarios
+1. **Upload Bank Statement (CAMT.053 / MT940)**:
+   * Administrator uploads daily bank statement XML files retrieved from clearing banks.
+2. **Resolve Reconciliation Discrepancies**:
+   * Lines failing automated matching (due to fee deductions or mismatched references) are inspected and cleared with manual adjustment entries.
 
-### D) Arka Plan İşçisi Senaryoları (System Worker Use Cases)
-1. **Outbox Event Publisher**:
-   * `transactional_outbox` tablosundaki işlenmemiş kayıtları `SKIP LOCKED` ile çekip Kafka'ya güvenle basar.
+### D) Background Worker Scenarios
+1. **Transactional Outbox Publisher**:
+   * Continuously polls `transactional_outbox` rows with `SKIP LOCKED` and streams events into Redpanda/Kafka topics with at-least-once delivery guarantees.
 2. **Factoring Payout Scheduler**:
-   * Onaylanan faktoring taleplerini sanal thread'ler (Virtual Threads) ile işleyip `payment-service`'e gRPC üzerinden anında transfer emri gönderir.
+   * Uses Virtual Threads to evaluate approved factoring invoices, verify fraud scores with Risk Service, and trigger immediate payment via Payment gRPC API.

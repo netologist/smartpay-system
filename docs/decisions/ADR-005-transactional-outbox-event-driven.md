@@ -1,23 +1,23 @@
-# ADR-005: Dağıtık Olaylar İçin PostgreSQL SKIP LOCKED Transactional Outbox
+# ADR-005: Transactional Outbox Pattern with PostgreSQL SKIP LOCKED
 
-## Durum
-**KABUL EDİLDİ**
+## Status
+**ACCEPTED**
 
-## Tarih
+## Date
 2026-09-05
 
-## Bağlam
-Mikroservis mimarisinde en sık karşılaşılan tuzaklardan biri "Çift Yazma (Dual-Write)" problemidir:
+## Context
+A major challenge in distributed architectures is the "dual-write" dilemma:
 ```java
-// TEHLİKELİ ANTIPATTERN:
-paymentRepository.save(payment); // Veritabanına yazıldı
-kafkaTemplate.send("payments", event); // Ağ koptu, Kafka çöktü -> EVENT KAYBOLDU!
+// DANGEROUS DUAL-WRITE ANTIPATTERN:
+paymentRepository.save(payment);       // Committed to DB
+kafkaTemplate.send("payments", event); // Network fails / broker down -> EVENT LOST!
 ```
-Veritabanı transaction'ı commit edilirken aynı anda harici bir mesaj kuyruğuna (Kafka) güvenle yazmak dağıtık iki aşamalı commit (2PC / XA) gerektirir; bu da sistemi yavaşlatır ve kırılganlaştırır.
+Writing to a database and publishing to a message broker in an uncoordinated manner leads to state divergence. Implementing distributed two-phase commit (2PC / XA) between PostgreSQL and Kafka is prohibitively slow, complex, and brittle.
 
-## Karar
-Tüm asenkron olay yayınlama süreçlerinde **Transactional Outbox Deseni** kullanılmasına karar verilmiştir:
-1. **Outbox Tablosu (`transactional_outbox`)**: İş mantığı transaction'ı ile aynı veritabanı oturumunda olay satırı (`JSONB` payload) kaydedilir. ACID garantisiyle olay kesinlikle veritabanında saklanır.
+## Decision
+Adopt the **Transactional Outbox Pattern** with PostgreSQL row-level locking:
+1. **Outbox Table (`transactional_outbox`)**: Domain state changes and the corresponding integration event payload (`JSONB`) are saved within the same local database transaction. ACID guarantees that the event is committed if and only if the business data is committed.
 2. **PostgreSQL SKIP LOCKED Polling**:
    ```sql
    SELECT * FROM transactional_outbox
@@ -26,9 +26,9 @@ Tüm asenkron olay yayınlama süreçlerinde **Transactional Outbox Deseni** kul
    LIMIT 50
    FOR UPDATE SKIP LOCKED;
    ```
-   Bu sorgu sayesinde birden fazla sanal thread veya worker instance'ı birbirini bloklamadan saniyede binlerce eventi kuyruğa aktarır.
-3. **At-Least-Once Delivery**: Mesaj Kafka'ya teslim edildikten sonra `processed_at = NOW()` olarak güncellenir.
+   Multiple Virtual Thread worker instances can poll the table concurrently without lock contention or thread blocking.
+3. **At-Least-Once Delivery**: Events are published to Kafka and marked `processed_at = CURRENT_TIMESTAMP`.
 
-## Sonuçlar
-* **Olumlu**: Sıfır veri kaybı garantisi, Kafka arızalarında sistemin çalışmaya devam edebilmesi, yüksek eşzamanlı polling performansı.
-* **Olumsuz**: Mesajlar tüketiciler tarafından idempotent işlenmelidir (çünkü ağ hatalarında aynı mesaj birden fazla iletilebilir).
+## Consequences
+* **Positive**: Zero event loss guarantee, resilience against broker downtime, high-throughput concurrent polling.
+* **Negative**: Downstream consumers must handle duplicate events idempotently (at-least-once semantics).

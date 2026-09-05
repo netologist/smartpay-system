@@ -1,76 +1,76 @@
-# STORY-003: Ödeme Başlatma & Transactional Outbox Motoru
+# STORY-003: Payment Initiation & Transactional Outbox Engine
 
-## 📌 Genel Bakış
-* **Hedef Modül**: `smartpay-payment-service`
-* **Öncelik**: P1 (Ödeme & Dağıtık Tutarlılık)
-* **İlişkili Veritabanı Tabloları**: `transactional_outbox` (`V4`), `idempotency_records` (`V5`)
-* **İlişkili gRPC Bağımlılığı**: `smartpay-ledger-service` (`smartpay-proto/src/main/proto/ledger.proto`)
-* **Kullanılacak `smartpay-common` Bileşenleri**:
-  * `Money` (Ödeme tutarı)
-  * `AccountId`, `TenantId`, `IdempotencyKey`, `EndToEndId`
+## 📌 Overview
+* **Target Module**: `smartpay-payment-service`
+* **Priority**: P1 (Disbursement & Distributed Consistency)
+* **Associated Database Tables**: `transactional_outbox` (`V4`), `idempotency_records` (`V5`)
+* **Associated gRPC Dependency**: `smartpay-ledger-service` (`smartpay-proto/src/main/proto/ledger.proto`)
+* **Required `smartpay-common` Components**:
+  * `Money` (Payment and hold amounts)
+  * `AccountId`, `TenantId`, `IdempotencyKey`, `EndToEndId` (Strongly-typed IDs)
   * `IdempotencyStatus` (`PROCESSING`, `COMPLETED`, `FAILED`)
   * `IdempotencyConflictException`, `RequestHashMismatchException`, `DuplicateTransactionException`
-  * `OutboxEvent` (At-least-once event kaydı)
+  * `OutboxEvent` (At-least-once outbox persistence)
 
 ---
 
-## 🎯 Kullanıcı Hikayesi
-> **Bir** Ödeme İletim Sistemi olarak,  
-> **Faster Payments ve VRP ödeme emirlerini** çift katmanlı idempotency kontrolüyle başlatmak, Ledger servisine gRPC ile bloke koydurmak ve Kafka event'lerini transactional outbox tablosuna yazmak istiyorum,  
-> **Böylece** ağ kesintilerinde çift çekim yaşanmasın ve veri kaybı olmadan en az bir kez (at-least-once) mesaj teslimi garanti edilsin.
+## 🎯 User Story
+> **As a** Payment Orchestration Service,  
+> **I want to** initiate Faster Payments and Open Banking disbursements with two-tier idempotency locking, reserve balances via Ledger gRPC, and commit events to a Transactional Outbox,  
+> **So that** duplicate withdrawals are impossible during network retries and events are guaranteed to reach Redpanda/Kafka without dual-write data loss.
 
 ---
 
-## 📐 Mimari ve Dağıtık Tasarım Kuralları
+## 📐 Architecture & Distributed Consistency Rules
 
-1. **Transactional Outbox Deseni (Dual-Write Problemini Önleme)**:
-   * Bir veritabanı transaction'ı içinde hem iş tablosu güncellenmeli hem de `transactional_outbox` tablosuna event satırı (`JSONB` payload) yazılmalıdır.
-   * Kafka'ya mesaj doğrudan web isteği anında **atılmaz**; outbox tablosuna yazılır. Bir arka plan worker'ı bu tabloyu okuyup Kafka'ya basar.
+1. **Transactional Outbox Pattern (Dual-Write Prevention)**:
+   * Both business entities and the `transactional_outbox` row (`JSONB` payload) must be committed within the identical database transaction.
+   * Direct message publishing to Kafka during the web request is prohibited; an asynchronous worker polls the outbox table.
 
-2. **İki Aşamalı Dağıtık Idempotency**:
-   * **Adım 1**: İstek geldiğinde request body SHA-256 hash'i hesaplanır. `idempotency_records` tablosuna `PROCESSING` statüsünde kilit atılır (`PRIMARY KEY (tenant_id, idempotency_key)`).
-   * **Adım 2**: Eğer aynı anahtarla işlem sürüyorsa `IdempotencyConflictException`, farklı gövdeyle geldiyse `RequestHashMismatchException` fırlatılır.
-   * **Adım 3**: İşlem başarıyla bitince statü `COMPLETED` yapılır ve response gövdesi saklanır. Mükerrer isteklerde aynı response hemen dönülür.
+2. **Two-Tier Distributed Idempotency**:
+   * **Step 1**: Compute the SHA-256 digest of the request payload (`request_hash`).
+   * **Step 2**: Insert into `idempotency_records` with status `PROCESSING`. If a row exists with status `PROCESSING`, throw `IdempotencyConflictException`. If the existing hash differs, throw `RequestHashMismatchException`.
+   * **Step 3**: Upon completion, transition status to `COMPLETED` and cache the response. Duplicate requests immediately return the cached payload with header `X-Cache: IDEMPOTENT-HIT`.
 
-3. **Ledger gRPC İletişimi**:
-   * Ödeme emri çıkmadan önce Ledger servisinin `HoldFunds` metodu çağrılarak borçlu hesaba bloke koyulur.
-
----
-
-## ✅ Kabul Kriterleri (Acceptance Criteria)
-
-### AC-1: İdempotent Ödeme Başlatma
-* **Given**: 500 GBP tutarında geçerli bir ödeme emri geldiğinde,
-* **When**: `initiatePayment(request)` çağrıldığında,
-* **Then**: `idempotency_records` tablosunda kayıt oluşturulmalı, Ledger gRPC üzerinden `HoldFunds` çağrılmalı ve `transactional_outbox` tablosuna `PAYMENT_INITIATED` eventi yazılmalıdır.
-
-### AC-2: Mükerrer İstek Korunması
-* **Given**: İlk istek tamamlandıktan sonra aynı `idempotency_key` ve aynı payload ile ikinci bir istek geldiğinde,
-* **When**: `initiatePayment` çağrıldığında,
-* **Then**: Ledger'a tekrar gidilmemeli, outbox'a yeni event atılmamalı; önceki başarılı sonuç dönmelidir.
-
-### AC-3: Outbox Polling Güvencesi (SKIP LOCKED)
-* **Given**: `transactional_outbox` tablosunda işlenmemiş (`processed_at IS NULL`) event'ler varken,
-* **When**: Outbox worker çalıştığında,
-* **Then**: Kayıtlar `ORDER BY created_at ASC FOR UPDATE SKIP LOCKED` ile kilitlenip okunmalı, Kafka'ya iletildikten sonra `processed_at = NOW()` olarak işaretlenmelidir.
+3. **Ledger gRPC Synchronization**:
+   * The payment service must invoke `HoldFunds` on `smartpay-ledger-service` via gRPC before triggering external bank APIs.
 
 ---
 
-## 💻 Geliştirilecek Sınıflar Rehberi
+## ✅ Acceptance Criteria (AC)
+
+### AC-1: Idempotent Payment Initiation
+* **Given**: A valid payment request for £500,
+* **When**: `initiatePayment(request)` is executed,
+* **Then**: An `idempotency_records` row is created, `HoldFunds` is called on Ledger gRPC, and a `transactional_outbox` row (`PAYMENT_INITIATED`) is committed atomically.
+
+### AC-2: Duplicate Request Protection
+* **Given**: A previously completed payment request,
+* **When**: A second request arrives with the identical `idempotency_key` and matching body hash,
+* **Then**: Ledger is not re-invoked, no new outbox event is stored, and the cached response is returned immediately.
+
+### AC-3: Outbox Polling Invariant (SKIP LOCKED)
+* **Given**: Unprocessed rows (`processed_at IS NULL`) in `transactional_outbox`,
+* **When**: The outbox worker executes,
+* **Then**: Rows are fetched using `ORDER BY created_at ASC FOR UPDATE SKIP LOCKED`, dispatched to Kafka, and updated with `processed_at = NOW()`.
+
+---
+
+## 💻 Class Implementation Structure
 
 ```
 smartpay-payment-service/src/main/java/com/hozgan/smartpay/payment/
 ├── service/
-│   ├── PaymentService.java             // Ödeme başlatma, tamamlama, iptal
-│   ├── IdempotencyService.java         // 2-tier SHA-256 kilit mekanizması
+│   ├── PaymentService.java             // Initiation, settlement, cancellation
+│   ├── IdempotencyService.java         // Two-tier SHA-256 lock state machine
 │   └── impl/
 │       ├── PaymentServiceImpl.java
 │       └── IdempotencyServiceImpl.java
 ├── grpc/
 │   └── client/
-│       └── LedgerGrpcClient.java       // Ledger gRPC stub çağrı sarmalayıcısı
+│       └── LedgerGrpcClient.java       // Stubs and channel wrapper for Ledger RPCs
 ├── worker/
-│   └── OutboxEventPublisherWorker.java // @Scheduled sanal thread tabanlı outbox okuyucu
+│   └── OutboxEventPublisherWorker.java // @Scheduled Virtual Thread outbox publisher
 └── web/
     └── PaymentController.java          // REST POST /api/v1/payments/initiate
 ```

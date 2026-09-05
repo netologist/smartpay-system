@@ -1,55 +1,54 @@
-# gRPC & Protocol Buffers Teknik Rehberi (Spring Boot 4.1 & Modern Java 25)
+# gRPC & Protocol Buffers Technical Guide (Spring Boot 4.1 & Modern Java 25)
 
-## 1. gRPC Nedir ve Neden REST Yerine Tercih Ettik?
-gRPC (Google Remote Procedure Call), mikroservislerin birbirleriyle doğrudan fonksiyon çağrısı yapar gibi haberleşmesini sağlayan, **HTTP/2** protokolü üzerinde çalışan yüksek performanslı bir RPC çerçevesidir.
+## 1. What is gRPC and Why We Choose It Over REST for Internal Calls
+gRPC (Google Remote Procedure Call) is a modern, open-source RPC framework that enables microservices to communicate with the semantics of a local method invocation over **HTTP/2**.
 
 ### REST (JSON over HTTP/1.1) vs gRPC (Protobuf over HTTP/2)
-| Özellik | Klasik REST (JSON) | gRPC (Protocol Buffers) |
+| Dimension | Traditional REST (JSON) | gRPC (Protocol Buffers) |
 | :--- | :--- | :--- |
-| **Serileştirme** | Metin tabanlı JSON (Ağır, yavaş ayrıştırma) | İkili (Binary) Protobuf (Kompakt, aşırı hızlı) |
-| **Ağ Protokolü** | HTTP/1.1 (Her istek için yeni TCP/el sıkışma) | HTTP/2 (Tek TCP bağlantısı üzerinden Multiplexing) |
-| **Tip Güvenliği** | İsteğe bağlı (OpenAPI/Swagger) | Zorunlu derleme zamanı tip güvenliği (`.proto`) |
-| **Performans** | Orta (Finansal SLA'ler için gecikme yaratabilir) | 7 ila 10 kat daha düşük CPU ve ağ gecikmesi |
-| **Kod Üretimi** | Manuel DTO/Client yazımı | `protoc` ile otomatik Java Stub/Message üretimi |
+| **Serialization** | Text-based JSON (high CPU, verbose parsing) | Binary Protocol Buffers (dense, ultra-fast serialization) |
+| **Network Protocol** | HTTP/1.1 (new TCP handshake per connection) | HTTP/2 (multiplexing over a single persistent TCP connection) |
+| **Type Safety** | Optional / advisory (OpenAPI / Swagger) | Strict compile-time contract enforcement (`.proto`) |
+| **Performance** | Moderate (latency spikes under financial SLAs) | 7x to 10x lower CPU and network latency |
+| **Code Generation** | Manual DTOs and client implementations | Automated Java message and stub generation via `protoc` |
 
 ---
 
-## 2. Projemizdeki gRPC Mimarisi (`smartpay-proto`)
+## 2. Platform Architecture in `smartpay-proto`
 
-`smartpay-proto` modülümüz derlendiğinde (`mvn compile -pl smartpay-proto`), `.proto` dosyalarını okuyarak `target/generated-sources/protobuf/` altına iki tür Java sınıfı üretir:
+When `smartpay-proto` is compiled (`mvn compile -pl smartpay-proto`), it scans `.proto` schema files and produces generated Java classes under `target/generated-sources/protobuf/`:
 
-### A) Message Sınıfları (Veri Taşıyıcılar)
-`protoc` derleyicisi her `message` için immutable (değiştirilemez) bir Java sınıfı ve bir `Builder` üretir.
+### A) Message Classes (Data Carriers)
+The `protoc` compiler generates an immutable Java class and a corresponding `Builder` for each protobuf `message`:
 ```java
-// Protobuf nesnesi ÜRETME (Builder Deseni):
+// Producing a Protobuf message (Builder pattern):
 MoneyProto moneyProto = MoneyProto.newBuilder()
         .setCurrency("GBP")
         .setAmountInPence(1050) // 10.50 GBP
         .build();
 
-// Protobuf nesnesinden OKUMA:
+// Consuming from a Protobuf message:
 String currency = moneyProto.getCurrency();
 long pence = moneyProto.getAmountInPence();
 ```
 
-### B) Service Grpc Sınıfları (İstemci ve Sunucu İskeletleri)
-Örneğin `ledger.proto` içindeki `service LedgerService`:
-* `LedgerServiceGrpc.LedgerServiceImplBase`: **Sunucu (Server)** tarafında extend edeceğimiz soyut sınıf.
-* `LedgerServiceGrpc.LedgerServiceBlockingStub`: **İstemci (Client)** tarafında senkron çağrı yapacağımız stub.
-* `LedgerServiceGrpc.LedgerServiceStub`: Reaktif / Asenkron istemci stub'ı.
+### B) Service Grpc Classes (Client & Server Stubs)
+For `service LedgerService` defined in `ledger.proto`:
+* `LedgerServiceGrpc.LedgerServiceImplBase`: The abstract server class to extend when implementing the service.
+* `LedgerServiceGrpc.LedgerServiceBlockingStub`: The synchronous client stub used for blocking RPC calls.
+* `LedgerServiceGrpc.LedgerServiceStub`: The asynchronous, reactive client stub.
 
 ---
 
-## 3. gRPC Sunucusu (Server) Nasıl Yazılır?
+## 3. Implementing a gRPC Server in Spring Boot
 
-### `StreamObserver<T>` Mantığı
-gRPC, klasik `return Response` yerine reaktif `StreamObserver<T>` yapısını kullanır.
-Bir metoda istek geldiğinde yanıt şu 3 adımdan biriyle verilir:
-1. `responseObserver.onNext(response)`: İstemciye yanıt nesnesini gönderir.
-2. `responseObserver.onCompleted()`: Yanıt akışının bittiğini ve isteğin başarıyla kapandığını bildirir.
-3. `responseObserver.onError(throwable)`: Bir hata oluştuğunu ve isteğin iptal olduğunu bildirir.
+### Understanding `StreamObserver<T>`
+gRPC uses the reactive `StreamObserver<T>` interface rather than direct method returns:
+1. `responseObserver.onNext(response)`: Emits the response message to the client.
+2. `responseObserver.onCompleted()`: Closes the stream, signaling successful RPC completion.
+3. `responseObserver.onError(throwable)`: Terminates the RPC with an error status.
 
-### Örnek: `LedgerGrpcService.java`
+### Example Server Implementation: `LedgerGrpcService.java`
 ```java
 package com.hozgan.smartpay.ledger.grpc;
 
@@ -76,13 +75,13 @@ public class LedgerGrpcService extends LedgerServiceGrpc.LedgerServiceImplBase {
     @Override
     public void getBalance(GetBalanceRequest request, StreamObserver<GetBalanceResponse> responseObserver) {
         try {
-            // 1. Protobuf tipinden smartpay-common tipine çevir
+            // 1. Map from Protobuf DTO to smartpay-common domain types
             AccountId accountId = AccountId.of(request.getAccountId());
 
-            // 2. Domain servisini çağır
+            // 2. Execute domain service logic
             AccountBalance balance = balanceService.getBalance(accountId);
 
-            // 3. Domain modelini Protobuf yanıtına dönüştür
+            // 3. Map domain result back to Protobuf response
             GetBalanceResponse response = GetBalanceResponse.newBuilder()
                     .setAccountId(balance.accountId().asString())
                     .setClearedBalance(toMoneyProto(balance.clearedBalance()))
@@ -91,24 +90,23 @@ public class LedgerGrpcService extends LedgerServiceGrpc.LedgerServiceImplBase {
                     .setVersion(balance.version())
                     .build();
 
-            // 4. Yanıtı ilet ve isteği tamamla
+            // 4. Send response and complete call
             responseObserver.onNext(response);
             responseObserver.onCompleted();
 
         } catch (InsufficientFundsException ex) {
-            // Domain hatasını gRPC Status hatasına çevir (HTTP 400/422 muadili FAILED_PRECONDITION)
+            // Translate domain exception to standard gRPC Status code (FAILED_PRECONDITION)
             responseObserver.onError(Status.FAILED_PRECONDITION
                     .withDescription(ex.getMessage())
                     .asRuntimeException());
         } catch (Exception ex) {
-            // Beklenmeyen sistem hataları (HTTP 500 muadili INTERNAL)
+            // Translate unexpected errors to gRPC Status INTERNAL
             responseObserver.onError(Status.INTERNAL
                     .withDescription("Internal ledger error: " + ex.getMessage())
                     .asRuntimeException());
         }
     }
 
-    // Mapper Yardımcısı (smartpay-common -> smartpay-proto)
     private MoneyProto toMoneyProto(Money money) {
         return MoneyProto.newBuilder()
                 .setCurrency(money.currency().getCurrencyCode())
@@ -120,11 +118,11 @@ public class LedgerGrpcService extends LedgerServiceGrpc.LedgerServiceImplBase {
 
 ---
 
-## 4. Bir Mikroservis Başka Bir Mikroservisi gRPC ile Nasıl Çağırır (Client Stub)?
+## 4. Invoking Another Microservice via gRPC Client Stub
 
-Örneğin `smartpay-payment-service`, bakiye kontrolü için `smartpay-ledger-service`'i çağırırken:
+Example: `smartpay-payment-service` calling `smartpay-ledger-service` to hold funds.
 
-### A) Channel ve Stub Yapılandırması (Configuration Bean)
+### A) Channel and Stub Configuration
 ```java
 package com.hozgan.smartpay.payment.config;
 
@@ -141,9 +139,9 @@ public class GrpcClientConfig {
     @Bean
     public ManagedChannel ledgerChannel(
             @Value("${smartpay.ledger.grpc.host:localhost}") String host,
-            @Value("${smartpay.ledger.grpc.port:9090}") int port) {
+            @Value("${smartpay.ledger.grpc.port:9091}") int port) {
         return ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext() // Prod ortamında mTLS/TLS kullanılır
+                .usePlaintext() // In production environments, configure TLS/mTLS
                 .build();
     }
 
@@ -154,7 +152,7 @@ public class GrpcClientConfig {
 }
 ```
 
-### B) Servis İçinde Kullanım (Client Çağrısı)
+### B) Executing the RPC in Application Service
 ```java
 @Service
 public class PaymentProcessingService {
@@ -171,7 +169,7 @@ public class PaymentProcessingService {
                     .setAccountId(accountId.asString())
                     .build();
 
-            // Senkron gRPC çağrısı (Ağ üzerinden binary veri akışı)
+            // Synchronous RPC call over HTTP/2 binary stream
             GetBalanceResponse response = ledgerStub.getBalance(request);
 
             Money available = Money.ofMinor(
@@ -185,7 +183,7 @@ public class PaymentProcessingService {
 
         } catch (StatusRuntimeException ex) {
             if (ex.getStatus().getCode() == Status.Code.FAILED_PRECONDITION) {
-                // Karşı servisten gelen domain hatasını yönet
+                // Handle precondition error from peer service
             }
             throw new SmartpayDomainException("GRPC_COMMUNICATION_ERROR", ex.getMessage(), ex);
         }
@@ -195,13 +193,13 @@ public class PaymentProcessingService {
 
 ---
 
-## 5. `smartpay-common` ile gRPC Arasındaki Altın Kurallar
+## 5. Golden Rules for `smartpay-common` & gRPC Integration
 
-1. **Protobuf Modelleri Veritabanına Yazılmaz**:
-   * Protobuf sınıfları (`MoneyProto`, `GetBalanceResponse`) yalnızca ağ taşıma katmanıdır (DTO).
-   * Veritabanı ve iş mantığında **daima `smartpay-common` sınıfları** (`Money`, `AccountId`, `AccountBalanceEntity`) kullanılır.
-2. **Sınırda Dönüşüm (Boundary Mapping)**:
-   * gRPC servisine istek girer girmez `request -> common domain records` çevrimi yapılır.
-   * Domain servisi işini bitirince `common domain records -> response proto` çevrilip geri verilir.
-3. **Exception Çevrimi**:
-   * Domain'de fırlatılan `SmartpayDomainException` alt sınıfları gRPC katmanında uygun `Status` koduna (`INVALID_ARGUMENT`, `FAILED_PRECONDITION`, `NOT_FOUND`, `ALREADY_EXISTS`) dönüştürülmelidir.
+1. **Protobuf Messages Must Never Leak Into Persistence**:
+   * Protobuf classes (`MoneyProto`, `GetBalanceResponse`) are strictly network transport DTOs.
+   * Entities and repositories must always use `smartpay-common` domain models (`Money`, `AccountId`, `AccountBalanceEntity`).
+2. **Boundary Transformation (Anti-Corruption Layer)**:
+   * Transform `Request Proto -> Domain Model` immediately at the gRPC controller boundary.
+   * Transform `Domain Model -> Response Proto` before calling `responseObserver.onNext()`.
+3. **Status Code Mapping**:
+   * Map `SmartpayDomainException` subclasses to standard gRPC `Status` codes (`INVALID_ARGUMENT`, `FAILED_PRECONDITION`, `NOT_FOUND`, `ALREADY_EXISTS`) so client stubs receive structured error signals.

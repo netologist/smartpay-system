@@ -1,28 +1,26 @@
-# ADR-006: SHA-256 İstek Parmak İzi ile İki Katmanlı Dağıtık Idempotency
+# ADR-006: Two-Tier Distributed Idempotency via SHA-256 Fingerprinting
 
-## Durum
-**KABUL EDİLDİ**
+## Status
+**ACCEPTED**
 
-## Tarih
+## Date
 2026-09-05
 
-## Bağlam
-Finansal API'lerde istemciler ağ kesintisi, zaman aşımı (timeout) veya mobil bağlantı kopması nedeniyle aynı ödeme veya fatura isteğini birden fazla kez yeniden denerler (retry). Eğer sistem idempotent değilse:
-* Aynı fatura için taşımacıya iki kez ödeme çıkabilir (çift ödeme felaketi).
-* Kötü niyetli aktörler aynı `Idempotency-Key` başlığıyla farklı tutarlar göndererek sistemi manipüle edebilir.
+## Context
+In financial APIs, clients routinely retry operations due to network drops, timeouts, or mobile disconnection. Without robust idempotency protection:
+* A carrier might be disbursed funds twice for the same freight invoice.
+* Malicious actors could manipulate request bodies under a reused idempotency key to alter payment destinations or amounts.
 
-## Karar
-Sistemin tüm mutasyon (POST / PUT) uç noktalarında **İki Katmanlı Dağıtık Idempotency (Two-Tier Idempotency)** uygulanmasına karar verilmiştir:
-1. **Katman 1: İstek Parmak İzi (SHA-256 Fingerprinting)**:
-   Gelen HTTP gövdesinin kriptografik SHA-256 özeti çıkarılır (`request_hash`).
-2. **Katman 2: Veritabanı Kompozit Kilidi (`tenant_id`, `idempotency_key`)**:
-   `idempotency_records` tablosuna `status = 'PROCESSING'` olarak ilk satır yazılır.
-   * Eğer satır zaten varsa ve durum `PROCESSING` ise: `IdempotencyConflictException` (HTTP 409).
-   * Eğer satır var ama gelen `request_hash` kayıtlı olandan farklıysa: `RequestHashMismatchException` (HTTP 422 - Güvenlik ihlali).
-   * Eğer satır var ve durum `COMPLETED` ise: İş mantığı tekrar çalıştırılmaz, kaydedilmiş olan `response_code` ve `response_body` anında dönülür (`X-Cache: IDEMPOTENT-HIT`).
-3. **TTL ve Süre Aşımı (`expires_at`)**:
-   İdempotency anahtarları 24 saat geçerlidir; arka plan job'ı süresi dolan kayıtları temizler.
+## Decision
+Enforce a **Two-Tier Distributed Idempotency State Machine** on all state-mutating endpoints:
+1. **Tier 1: Request Fingerprinting**: Calculate a cryptographic SHA-256 hash of the incoming HTTP payload (`request_hash`).
+2. **Tier 2: Database Composite Lock (`tenant_id`, `idempotency_key`)**:
+   Insert a row into `idempotency_records` with `status = 'PROCESSING'`.
+   * If a record already exists with status `PROCESSING`: Reject with `IdempotencyConflictException` (HTTP 409).
+   * If a record exists but the incoming `request_hash` differs: Reject with `RequestHashMismatchException` (HTTP 422 - tamper attempt).
+   * If a record exists with status `COMPLETED`: Short-circuit business logic and return the cached `response_code` and `response_body` immediately with header `X-Cache: IDEMPOTENT-HIT`.
+3. **TTL Clean-up**: Idempotency records expire after 24 hours via `expires_at` and an automated purging job.
 
-## Sonuçlar
-* **Olumlu**: Sıfır çift çekim/çift ödeme riski, kurcalamaya karşı kriptografik gövde doğrulaması, hızlı önbellek yanıtları.
-* **Olumsuz**: Her mutasyon isteğinde ek bir veritabanı okuma/yazma işlemi yapılır (ancak finansal güvenlik için bu ihmal edilebilir bir maliyettir).
+## Consequences
+* **Positive**: Absolute prevention of duplicate payouts, tamper-resistant request validation, sub-millisecond cached responses on client retries.
+* **Negative**: Introduces an extra database read/write per mutating request (an essential trade-off in financial architectures).

@@ -1,60 +1,60 @@
-# C4 Mimari Modelleri (C4 Architecture Models)
+# C4 Architecture Models
 
-Bu doküman, SmartPay Lojistik Ödeme ve Fintek Platformu'nun **C4 Model** (Context, Container, Component, Code) standardına göre katmanlı mimari diyagramlarını içerir.
+This document presents the layered architecture diagrams for the SmartPay Logistics Payment Platform following the **C4 Model** (Context, Container, Component, Code) standard.
 
 ---
 
-## 🏛️ Seviye 1: Sistem Bağlam Diyagramı (System Context Diagram)
+## 🏛️ Level 1: System Context Diagram
 
-SmartPay platformunun dış dünya aktörleri ve entegre olduğu harici finansal/lojistik sistemlerle ilişkisini gösterir.
+Illustrates the SmartPay platform within its operating environment, detailing human actors and external banking/logistics systems.
 
 ```mermaid
 C4Context
-    title Sistem Bağlam Diyagramı (System Context) - SmartPay Platformu
+    title System Context Diagram - SmartPay Platform
 
-    Person(shipper, "Yük Veren (Shipper)", "Navlun siparişi veren ve fatura ödemelerini gerçekleştiren kurumsal müşteri.")
-    Person(carrier, "Taşıyıcı / Sürücü (Carrier)", "Yükü taşıyan, teslimat kanıtı (ePOD) yükleyen ve erken ödeme (factoring) alan lojistik aktör.")
-    Person(financeOps, "Finans Operatörü", "Banka mutabakatlarını denetleyen ve şüpheli işlemleri yöneten şirket içi yetkili.")
+    Person(shipper, "Shipper (Merchant)", "Corporate freight customer ordering transport and settling invoices.")
+    Person(carrier, "Carrier / Driver", "Logistics actor delivering freight, uploading ePOD proof, and requesting factoring liquidity.")
+    Person(financeOps, "Finance Operations Admin", "Internal administrator overseeing bank statement reconciliation and financial ledger audits.")
 
     Enterprise_Boundary(b0, "SmartPay Logistics Payment Platform") {
-        System(smartpay, "SmartPay Core Platform", "Çift taraflı defter, lojistik faturalandırma, faktoring hak ediş ve banka mutabakatını yöneten dağıtık sistem.")
+        System(smartpay, "SmartPay Core Platform", "Distributed platform managing double-entry ledger, freight invoicing, factoring liquidity, and bank reconciliation.")
     }
 
-    System_Ext(bankRails, "Banka & Takas Sistemleri", "ClearBank, Barclays, Modulr (Faster Payments, BACS, Open Banking VRP API'leri).")
-    System_Ext(s3Storage, "AWS S3 / MinIO", "ePOD teslimat fotoğrafları ve dijital imza kanıtlarının saklandığı nesne deposu.")
-    System_Ext(notificationProvider, "SMS / Email Gateway", "Twilio / SendGrid teslimat ve ödeme bildirim sağlayıcıları.")
+    System_Ext(bankRails, "Banking & Clearing Rails", "ClearBank, Barclays, Modulr (Faster Payments, BACS, Open Banking VRP APIs).")
+    System_Ext(s3Storage, "AWS S3 / MinIO Storage", "Object storage for ePOD delivery photos and cryptographic digital signature proofs.")
+    System_Ext(notificationProvider, "SMS / Email Dispatcher", "Twilio / SendGrid communication gateways for delivery and settlement alerts.")
 
-    Rel(shipper, smartpay, "Fatura görüntüler, ödeme emri verir", "HTTPS / REST")
-    Rel(carrier, smartpay, "ePOD teslimat kanıtı yükler, erken ödeme talep eder", "HTTPS / Mobile App")
-    Rel(financeOps, smartpay, "Ekstre yükler, mutabakat ve defter raporlarını izler", "HTTPS / Web UI")
+    Rel(shipper, smartpay, "Views invoices, issues payments", "HTTPS / REST")
+    Rel(carrier, smartpay, "Submits ePOD proofs, requests instant factoring", "HTTPS / Mobile App")
+    Rel(financeOps, smartpay, "Uploads statements, monitors reconciliation reports", "HTTPS / Web UI")
 
-    Rel(smartpay, bankRails, "Ödeme emri iletir, CAMT.053 ekstre çeker", "mTLS / REST / ISO-20022")
-    Rel(smartpay, s3Storage, "Teslimat fotoğraflarını arşivler", "S3 API / IAM")
-    Rel(smartpay, notificationProvider, "Ödeme ve fatura bildirimlerini iletir", "REST / Webhooks")
+    Rel(smartpay, bankRails, "Executes payments, pulls CAMT.053 statements", "mTLS / REST / ISO-20022")
+    Rel(smartpay, s3Storage, "Archives delivery proof photos", "S3 API / IAM")
+    Rel(smartpay, notificationProvider, "Dispatches payment and invoice alerts", "REST / Webhooks")
 ```
 
 ---
 
-## 📦 Seviye 2: Konteyner Diyagramı (Container Diagram)
+## 📦 Level 2: Container Diagram
 
-SmartPay platformunu oluşturan mikroservisleri, veri depolarını ve servisler arası iletişim protokollerini (gRPC, Kafka, REST) gösterir.
+Depicts the microservices, data stores, and communication protocols (gRPC, Kafka, REST) that constitute the SmartPay platform.
 
 ```mermaid
 C4Container
-    title Konteyner Diyagramı (Container Diagram) - SmartPay Platformu
+    title Container Diagram - SmartPay Platform
 
-    Person(client, "İstemciler", "Web UI / Mobil Uygulamalar")
+    Person(client, "Clients", "Web UI / Mobile Apps")
 
-    Container(gateway, "API Gateway", "Spring Boot 4.1 / Java 25", "Ters proxy, JWT doğrulama, rate limiting ve iki katmanlı SHA-256 Idempotency filtresi.")
+    Container(gateway, "API Gateway", "Spring Boot 4.1 / Java 25", "Reverse proxy, JWT validation, rate limiting, and two-tier SHA-256 idempotency filter.")
 
-    Container_Boundary(microservices, "Mikroservis Ekosistemi") {
-        Container(invoiceService, "Invoice Service", "Spring Boot / Java 25", "ePOD imza doğrulama, navlun fiyatlama (baz + yakıt + KDV), fatura yaşam döngüsü.")
-        Container(ledgerService, "Ledger Service", "Spring Boot / Java 25", "Çift taraflı defter-i kebir, sıfır toplam değişmezi, bakiye bloke koyma/çözme, transfer motoru.")
-        Container(paymentService, "Payment Service", "Spring Boot / Java 25", "Ödeme başlatma, Faster Payments/VRP orkestrasyonu, Transactional Outbox.")
-        Container(payoutWorker, "Payout Worker", "Spring Boot / Virtual Threads", "Faktoring faturalarını tarayan ve anında erken ödeme çıkaran sanal thread arka plan işçisi.")
-        Container(reconService, "Reconciliation Service", "Spring Boot / Java 25", "CAMT.053 XML / MT940 banka ekstre ayrıştırma ve end_to_end_id defter mutabakatı.")
-        Container(riskService, "Risk Service", "Spring Boot / Java 25", "Taşıyıcı ve yük veren kredi skorlaması ve dolandırıcılık tespiti.")
-        Container(notificationService, "Notification Service", "Spring Boot / Java 25", "Olay odaklı SMS/E-posta bildirim gönderimi.")
+    Container_Boundary(microservices, "Microservice Ecosystem") {
+        Container(invoiceService, "Invoice Service", "Spring Boot / Java 25", "ePOD signature verification, freight pricing engine (base + fuel + VAT), invoice lifecycle.")
+        Container(ledgerService, "Ledger Service", "Spring Boot / Java 25", "Double-entry general ledger, zero-sum invariant, balance hold/release, atomic transfer engine.")
+        Container(paymentService, "Payment Service", "Spring Boot / Java 25", "Payment initiation, Faster Payments/VRP orchestration, Transactional Outbox.")
+        Container(payoutWorker, "Payout Worker", "Spring Boot / Virtual Threads", "Background worker polling verified invoices for instant factoring payouts via Virtual Threads.")
+        Container(reconService, "Reconciliation Service", "Spring Boot / Java 25", "CAMT.053 XML / MT940 bank statement ingestion and end_to_end_id ledger reconciliation.")
+        Container(riskService, "Risk Service", "Spring Boot / Java 25", "Carrier and shipper credit risk scoring and fraud prevention.")
+        Container(notificationService, "Notification Service", "Spring Boot / Java 25", "Event-driven SMS / Email notification engine.")
     }
 
     ContainerDb(ledgerDb, "Ledger DB", "PostgreSQL 16", "accounts, account_balances, journal_transactions, journal_entries")
@@ -63,62 +63,62 @@ C4Container
     ContainerDb(reconDb, "Recon DB", "PostgreSQL 16", "bank_statements, bank_statement_lines")
     ContainerQueue(kafka, "Redpanda / Kafka", "Kafka Wire Protocol", "smartpay.events.* (epod-verified, invoice-issued, payment-settled, ledger-posted)")
 
-    Rel(client, gateway, "API istekleri", "HTTPS / JSON")
-    Rel(gateway, invoiceService, "Fatura & ePOD çağrıları", "HTTP / REST")
-    Rel(gateway, paymentService, "Ödeme emirleri", "HTTP / REST")
+    Rel(client, gateway, "API Requests", "HTTPS / JSON")
+    Rel(gateway, invoiceService, "Invoice & ePOD calls", "HTTP / REST")
+    Rel(gateway, paymentService, "Payment orders", "HTTP / REST")
 
     Rel(invoiceService, kafka, "EpodVerified, InvoiceIssued", "Kafka Producer")
-    Rel(payoutWorker, invoiceService, "Onaylı faturaları sorgular", "REST / gRPC")
-    Rel(payoutWorker, paymentService, "Erken ödeme başlatır", "gRPC over HTTP/2")
+    Rel(payoutWorker, invoiceService, "Queries approved invoices", "REST / gRPC")
+    Rel(payoutWorker, paymentService, "Initiates instant payouts", "gRPC over HTTP/2")
 
     Rel(paymentService, ledgerService, "HoldFunds, TransferFunds", "gRPC over HTTP/2 (smartpay-proto)")
-    Rel(paymentService, kafka, "Outbox Worker ile event yayınlar", "Kafka Producer")
+    Rel(paymentService, kafka, "Publishes events via Outbox Worker", "Kafka Producer")
 
-    Rel(reconService, ledgerService, "İşlem referansı doğrular", "gRPC over HTTP/2")
+    Rel(reconService, ledgerService, "Verifies transaction references", "gRPC over HTTP/2")
 
-    Rel(ledgerService, ledgerDb, "Veri okuma/yazma (Pessimistic Lock)", "JDBC / HikariCP")
-    Rel(invoiceService, invoiceDb, "Fatura ve ePOD kaydı", "JDBC / HikariCP")
-    Rel(paymentService, paymentDb, "Outbox ve Idempotency kaydı", "JDBC / HikariCP")
-    Rel(reconService, reconDb, "Ekstre kaydı ve mutabakat", "JDBC / HikariCP")
+    Rel(ledgerService, ledgerDb, "Read/write data (Pessimistic Lock)", "JDBC / HikariCP")
+    Rel(invoiceService, invoiceDb, "Invoices and ePOD records", "JDBC / HikariCP")
+    Rel(paymentService, paymentDb, "Outbox and Idempotency records", "JDBC / HikariCP")
+    Rel(reconService, reconDb, "Statement lines and matching", "JDBC / HikariCP")
 ```
 
 ---
 
-## 🧩 Seviye 3: Bileşen Diyagramı (Component Diagram - Ledger Service)
+## 🧩 Level 3: Component Diagram (Ledger Service)
 
-Platformun en kritik bileşeni olan `smartpay-ledger-service` modülünün iç mimari yapısını ve katmanlarını gösterir.
+Breaks down the internal architecture of `smartpay-ledger-service`, Platform's core double-entry accounting engine.
 
 ```mermaid
 C4Component
-    title Bileşen Diyagramı (Component Diagram) - smartpay-ledger-service
+    title Component Diagram - smartpay-ledger-service
 
     Container_Boundary(ledgerBoundary, "smartpay-ledger-service") {
-        Component(ledgerGrpc, "LedgerGrpcService", "gRPC Controller", "smartpay-proto LedgerServiceImplBase implementasyonu. GetBalance, TransferFunds, HoldFunds endpoint'leri.")
-        Component(protoMapper, "LedgerProtoMapper", "Mapper", "Protobuf MoneyProto <-> smartpay-common Money çevrimi.")
-        Component(balanceService, "AccountBalanceService", "Domain Service", "Pessimistic Lock ile bakiye düşümü, hold/release yönetimi, negatif bakiye koruması.")
-        Component(ledgerEngine, "LedgerDomainService", "Domain Service", "Çift taraflı yevmiye fişi doğrulama (SUM(DEBIT) == SUM(CREDIT)) ve append-only kayıt.")
-        Component(balanceRepo, "AccountBalanceRepository", "Spring Data JPA", "PESSIMISTIC_WRITE lock destekli bakiye okuma ve optimistik version kontrolü.")
-        Component(accountRepo, "AccountRepository", "Spring Data JPA", "Hesap kartları CRUD.")
-        Component(txRepo, "JournalTransactionRepository", "Spring Data JPA", "Yevmiye fişi başlıkları ve tekillik.")
-        Component(entryRepo, "JournalEntryRepository", "Spring Data JPA", "Değiştirilemez borç/alacak muhasebe satırları.")
+        Component(ledgerGrpc, "LedgerGrpcService", "gRPC Controller", "Implementation of smartpay-proto LedgerServiceImplBase. Endpoints: GetBalance, TransferFunds, HoldFunds.")
+        Component(protoMapper, "LedgerProtoMapper", "Mapper", "Bidirectional mapper between Protobuf MoneyProto and smartpay-common Money.")
+        Component(balanceService, "AccountBalanceService", "Domain Service", "Pessimistic locking balance deduction, hold/release management, negative balance protection.")
+        Component(ledgerEngine, "LedgerDomainService", "Domain Service", "Double-entry journal validation (SUM(DEBIT) == SUM(CREDIT)) and append-only persistence.")
+        Component(balanceRepo, "AccountBalanceRepository", "Spring Data JPA", "Data access with PESSIMISTIC_WRITE locking and optimistic version tracking.")
+        Component(accountRepo, "AccountRepository", "Spring Data JPA", "Chart of accounts persistence.")
+        Component(txRepo, "JournalTransactionRepository", "Spring Data JPA", "Transaction headers and idempotency checking.")
+        Component(entryRepo, "JournalEntryRepository", "Spring Data JPA", "Immutable debit/credit ledger lines.")
     }
 
-    Rel(ledgerGrpc, protoMapper, "DTO / Proto dönüşümü", "Java in-process")
-    Rel(ledgerGrpc, balanceService, "İş kurallarını tetikler", "Java in-process")
-    Rel(ledgerGrpc, ledgerEngine, "Fiş kaydını tetikler", "Java in-process")
+    Rel(ledgerGrpc, protoMapper, "DTO / Proto transformation", "Java in-process")
+    Rel(ledgerGrpc, balanceService, "Triggers balance operations", "Java in-process")
+    Rel(ledgerGrpc, ledgerEngine, "Triggers journal posting", "Java in-process")
 
     Rel(balanceService, balanceRepo, "SELECT ... FOR UPDATE", "JPA")
-    Rel(balanceService, ledgerEngine, "Bakiye transferi için fiş keser", "Java in-process")
+    Rel(balanceService, ledgerEngine, "Posts journal lines for transfer", "Java in-process")
 
-    Rel(ledgerEngine, txRepo, "Fiş başlığı yazar", "JPA")
-    Rel(ledgerEngine, entryRepo, "Append-only satırlar yazar", "JPA")
+    Rel(ledgerEngine, txRepo, "Writes transaction header", "JPA")
+    Rel(ledgerEngine, entryRepo, "Appends debit/credit lines", "JPA")
 ```
 
 ---
 
-## 💻 Seviye 4: Kod / Sınıf Diyagramı (Code Diagram - Domain Core)
+## 💻 Level 4: Code Diagram (Core Domain Model)
 
-`smartpay-common` içindeki çekirdek domain modellerinin nesne yönelimli ve record temelli tasarımını gösterir.
+Demonstrates the object-oriented and record-based domain model implemented in `smartpay-common`.
 
 ```mermaid
 classDiagram

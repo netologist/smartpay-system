@@ -1,67 +1,67 @@
-# STORY-005: Banka Ekstresi & Otomatik Mutabakat Motoru
+# STORY-005: Bank Statement & Auto-Reconciliation Engine
 
-## 📌 Genel Bakış
-* **Hedef Modül**: `smartpay-recon-service`
-* **Öncelik**: P2 (Mutabakat & Finansal Raporlama)
-* **İlişkili Veritabanı Tabloları**: `bank_statements`, `bank_statement_lines` (`V6`)
-* **İlişkili Servisler**: `smartpay-ledger-service`
-* **Kullanılacak `smartpay-common` Bileşenleri**:
-  * `Money` (Ekstre bakiyeleri ve işlem tutarları)
-  * `StatementReference`, `EndToEndId`
+## 📌 Overview
+* **Target Module**: `smartpay-recon-service`
+* **Priority**: P2 (Reconciliation & Financial Control)
+* **Associated Database Tables**: `bank_statements`, `bank_statement_lines` (`V6`)
+* **Associated Services**: `smartpay-ledger-service`
+* **Required `smartpay-common` Components**:
+  * `Money` (Statement balances and line item amounts)
+  * `StatementReference`, `EndToEndId` (Strongly-typed IDs)
   * `EntryType`, `ReconciliationStatus` (`UNMATCHED`, `MATCHED`, `MANUALLY_ADJUSTED`)
   * `UnmatchedBankStatementException`
 
 ---
 
-## 🎯 Kullanıcı Hikayesi
-> **Bir** Finans Operasyon Yöneticisi olarak,  
-> **ClearBank / Barclays gibi bankalardan gelen CAMT.053 XML veya MT940 ekstrelerini içeri aktarmak**, her satırı `end_to_end_id` referansıyla muhasebe defterindeki yevmiye kayıtlarıyla otomatik eşleştirmek istiyorum,  
-> **Böylece** banka bakiyesi ile defter bakiyesi arasındaki farklar (discrepancy) dakikalar içinde tespit edilsin.
+## 🎯 User Story
+> **As a** Finance Operations Manager,  
+> **I want to** ingest ISO-20022 CAMT.053 XML and MT940 bank statements from clearing banks (e.g. ClearBank, Barclays) and automatically reconcile each line against double-entry journal postings using `end_to_end_id`,  
+> **So that** bank account cash positions match internal ledger balances and discrepancies are isolated within minutes.
 
 ---
 
-## 📐 Mimari ve Mutabakat Kuralları
+## 📐 Architecture & Matching Rules
 
-1. **Eşleştirme Anahtarı (Matching Key)**:
-   * Faster Payments / SEPA transferlerinde banka satırındaki `EndToEndId`, ödeme başlatılırken üretilen referanstır.
-   * `bank_statement_lines.end_to_end_id == journal_transactions.idempotency_key` veya `reference_id`.
+1. **Deterministic Matching Key**:
+   * For Faster Payments and SEPA disbursements, the statement `EndToEndId` equals the payment reference:
+     `bank_statement_lines.end_to_end_id == journal_transactions.idempotency_key` (or `reference_id`).
 
-2. **Tutar ve Yön Uyumu Değişmezi**:
-   * Bankada `CREDIT` (para girişi), defterde de hesaba `CREDIT` olmalıdır.
-   * Tutar kuruşu kuruşuna eşit olmalıdır (`bankAmount.equals(ledgerAmount)`).
-
----
-
-## ✅ Kabul Kriterleri (Acceptance Criteria)
-
-### AC-1: CAMT.053 Ekstre Ayrıştırma ve Kaydı
-* **Given**: Bankadan gelen 100 satırlık CAMT.053 XML dosyası yüklendiğinde,
-* **When**: `importStatement(xmlStream)` çağrıldığında,
-* **Then**: `bank_statements` ve `bank_statement_lines` tablolarına `reconciliation_status = UNMATCHED` olarak kaydedilmelidir.
-
-### AC-2: Otomatik Eşleştirme (Auto-Reconciliation)
-* **Given**: 500 GBP tutarında ve `E2E-998822` referanslı bir banka satırı varken,
-* **When**: Mutabakat motoru çalıştığında,
-* **Then**: Ledger servisinden bu referansa ait fiş aranmalı; tutar ve yön tutuyorsa satır `MATCHED` statüsüne çekilmeli ve `matched_entry_id` atanmalıdır.
-
-### AC-3: Uyuşmazlık Tespiti (Discrepancy Reporting)
-* **Given**: Referansı bulunan fakat tutarı bankada 500 GBP, defterde 490 GBP olan bir işlemde,
-* **When**: Eşleştirme yapıldığında,
-* **Then**: Otomatik eşleşme yapılmamalı, satır `MANUALLY_ADJUSTED` veya `UNMATCHED` olarak işaretlenmeli ve alert üretilmelidir.
+2. **Amount and Direction Invariants**:
+   * A bank `CREDIT` (inflow) corresponds to a ledger account `CREDIT`.
+   * Amounts must match to the exact minor unit (pence/cent): `bankAmount.equals(ledgerAmount)`.
 
 ---
 
-## 💻 Geliştirilecek Sınıflar Rehberi
+## ✅ Acceptance Criteria (AC)
+
+### AC-1: CAMT.053 XML Statement Ingestion
+* **Given**: A valid ISO-20022 CAMT.053 XML file containing 100 statement lines,
+* **When**: `importStatement(xmlStream)` is invoked,
+* **Then**: Rows are persisted in `bank_statements` and `bank_statement_lines` with `reconciliation_status = UNMATCHED`.
+
+### AC-2: Automated Matching Pipeline
+* **Given**: An unmatched statement line of £500 with reference `E2E-998822`,
+* **When**: The reconciliation matching algorithm runs,
+* **Then**: The matching ledger transaction is retrieved via gRPC; if amount, currency, and direction match, the line transitions to `MATCHED` and updates `matched_entry_id`.
+
+### AC-3: Discrepancy Detection & Alerting
+* **Given**: A statement line with £500 that matches a ledger transaction of £490,
+* **When**: Reconciliation executes,
+* **Then**: The line remains `UNMATCHED` (or flags as `DISCREPANCY`), and an audit discrepancy report is generated.
+
+---
+
+## 💻 Class Implementation Structure
 
 ```
 smartpay-recon-service/src/main/java/com/hozgan/smartpay/recon/
 ├── parser/
-│   ├── StatementParser.java            // CAMT.053 XML / MT940 ayrıştırıcı arayüzü
+│   ├── StatementParser.java            // CAMT.053 XML / MT940 parser interface
 │   └── impl/
 │       └── Camt053XmlStatementParser.java
 ├── service/
-│   ├── BankStatementService.java       // Ekstre yükleme ve sorgulama
-│   └── ReconciliationEngine.java       // E2E ID matching algoritması
+│   ├── BankStatementService.java       // Statement ingestion and persistence
+│   └── ReconciliationEngine.java       // EndToEndId matching algorithm
 └── web/
     └── ReconciliationController.java   // POST /api/v1/recon/statements/upload
 ```

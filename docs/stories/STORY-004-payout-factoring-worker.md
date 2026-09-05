@@ -1,62 +1,62 @@
-# STORY-004: Taşımacı Faktoring & Erken Ödeme Worker'ı
+# STORY-004: Carrier Factoring & Instant Payout Worker
 
-## 📌 Genel Bakış
-* **Hedef Modül**: `smartpay-payout-worker`
-* **Öncelik**: P1 (Faktoring & Likidite Motoru)
-* **İlişkili Servisler**: `smartpay-invoice-service`, `smartpay-payment-service`
-* **Kullanılacak `smartpay-common` Bileşenleri**:
-  * `Money` (Hak ediş ve faktoring komisyon hesaplaması)
-  * `CarrierId`, `InvoiceId`, `TransactionId`
+## 📌 Overview
+* **Target Module**: `smartpay-payout-worker`
+* **Priority**: P1 (Factoring Liquidity Engine)
+* **Associated Services**: `smartpay-invoice-service`, `smartpay-payment-service`
+* **Required `smartpay-common` Components**:
+  * `Money` (Gross invoice, factoring fee, and net payout calculation)
+  * `CarrierId`, `InvoiceId`, `TransactionId` (Strongly-typed IDs)
   * `FactoringPayoutApprovedEvent`
   * Virtual Threads (`Executors.newVirtualThreadPerTaskExecutor()`)
 
 ---
 
-## 🎯 Kullanıcı Hikayesi
-> **Bir** Lojistik Faktoring Motoru olarak,  
-> **Teslimatı doğrulanmış yük faturalarını tarayarak**, risk skorunu kontrol etmek ve taşımacıya 30-90 gün beklemek yerine %2.5 platform komisyonu kesintisiyle anında erken ödeme çıkarmak istiyorum,  
-> **Böylece** taşımacılar için nakit akışı likiditesi sağlansın, platform faktoring komisyon geliri elde etsin.
+## 🎯 User Story
+> **As an** Automated Factoring Liquidity Worker,  
+> **I want to** poll delivered freight invoices, evaluate credit and fraud scores, and disburse carrier funds immediately with a 2.5% platform fee deduction,  
+> **So that** carriers achieve instant cash flow liquidity rather than waiting 30-90 days, while the platform captures factoring fee revenue.
 
 ---
 
-## 📐 Mimari ve İş Mantığı Kuralları
+## 📐 Architecture & Pricing Rules
 
-1. **Faktoring Komisyon Hesaplama Formülü**:
+1. **Factoring Fee Calculation Invariant**:
    $$\text{Factoring Fee} = \text{Invoice Total} \times 0.025 \quad (2.5\%)$$
    $$\text{Payout Amount} = \text{Invoice Total} - \text{Factoring Fee}$$
-   Örnek: 1000 GBP fatura için:
-   * Faktoring Komisyonu (Platform Geliri): $£1000 \times 0.025 = £25.00$
-   * Taşımacıya Yatırılacak Erken Tutar: $£1000 - £25 = £975.00$
+   Example (£1000 Invoice):
+   * Factoring Fee (Platform Revenue): $£1000 \times 0.025 = £25.00$
+   * Net Carrier Payout: $£1000 - £25 = £975.00$
 
-2. **Virtual Thread Worker Havuzu**:
-   * Her bir ödeme emri bağımsız bir sanal thread (`Thread.ofVirtual()`) içinde çalıştırılmalıdır.
-   * Bloklayıcı gRPC/HTTP çağrılarında işletim sistemi carrier thread'leri kilitlenmez.
-
----
-
-## ✅ Kabul Kriterleri (Acceptance Criteria)
-
-### AC-1: Doğrulanmış Faturaların Taranması
-* **Given**: `invoices` tablosunda `status = EPOD_VERIFIED` olan faturalar varken,
-* **When**: Faktoring worker tetiklendiğinde,
-* **Then**: Uygun faturalar çekilmeli, %2.5 komisyon kesilerek net hak ediş hesaplanmalıdır.
-
-### AC-2: Ödeme Servisine Emrin İletilmesi
-* **Given**: 1000 GBP tutarındaki fatura için 975 GBP net tutar hesaplandığında,
-* **When**: `executeInstantPayout(invoiceId)` çağrıldığında,
-* **Then**: `PaymentService` gRPC uç noktası tetiklenerek taşımacı IBAN/hesabına transfer emri verilmeli, fatura statüsü `FACTORING_APPROVED` yapılmalıdır.
+2. **Virtual Thread Worker Pool**:
+   * Each invoice payout must execute inside an independent virtual thread (`Thread.ofVirtual()`).
+   * Blocking gRPC or HTTP RPC calls yield carrier threads without consuming OS thread pool capacity.
 
 ---
 
-## 💻 Geliştirilecek Sınıflar Rehberi
+## ✅ Acceptance Criteria (AC)
+
+### AC-1: Polling Verified Invoices
+* **Given**: Eligible invoices in `smartpay-invoice-service` with `status = EPOD_VERIFIED`,
+* **When**: The factoring scheduler executes,
+* **Then**: Invoices are fetched and net factoring amounts are computed accurately.
+
+### AC-2: Payout Execution via Payment gRPC
+* **Given**: An invoice with £1000 total and £975 net payout,
+* **When**: `executeInstantPayout(invoiceId)` executes,
+* **Then**: `PaymentService` gRPC is called to disburse funds to the carrier, and the invoice transitions to `FACTORING_APPROVED`.
+
+---
+
+## 💻 Class Implementation Structure
 
 ```
 smartpay-payout-worker/src/main/java/com/hozgan/smartpay/payout/
 ├── service/
-│   ├── FactoringCalculationService.java  // %2.5 komisyon ve net tutar hesabı
-│   └── PayoutExecutionService.java       // Payment gRPC entegrasyonu
+│   ├── FactoringCalculationService.java  // 2.5% fee and net calculation
+│   └── PayoutExecutionService.java       // Payment gRPC integration
 ├── worker/
-│   └── FactoringPayoutScheduler.java     // Sanal thread'lerle periyodik tarama
+│   └── FactoringPayoutScheduler.java     // Virtual Thread scheduled poller
 └── config/
-    └── VirtualThreadExecutorConfig.java  // Project Loom Executor yapılandırması
+    └── VirtualThreadExecutorConfig.java  // Project Loom Executor configuration
 ```

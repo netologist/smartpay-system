@@ -1,10 +1,10 @@
-# SmartPay Platform Geliştirme Hikayeleri (Story Cards)
+# SmartPay Platform Developer Story Cards
 
-Bu dizin, SmartPay Lojistik Ödeme ve Fintek Platformu'nun uçtan uca implementasyonu için hazırlanmış detaylı geliştirme kartlarını içerir.
+This directory contains detailed, production-ready developer story cards for building the SmartPay Logistics Payment Platform step-by-step.
 
 ---
 
-## 🗺️ Hikaye Haritası ve Bağımlılık Ağacı
+## 🗺️ Story Map & Dependency Graph
 
 ```mermaid
 graph TD
@@ -17,20 +17,26 @@ graph TD
 
 ---
 
-## 📚 Hikaye Listesi
+## 📚 Story Index
 
-| No | Başlık | Modül | Öncelik | Özet |
+| No | Title | Module | Priority | Summary |
 | :--- | :--- | :--- | :--- | :--- |
-| **STORY-001** | [Double-Entry Ledger & Atomik Transfer Motoru](STORY-001-ledger-double-entry-engine.md) | `smartpay-ledger-service` | P0 | Sıfır toplamlı yevmiye fişi, pessimistic lock ile bakiye transferi, hold/release mekanizması, Ledger gRPC API. |
-| **STORY-002** | [Navlun Faturası & ePOD Fiyatlandırma Motoru](STORY-002-invoice-epod-pricing-engine.md) | `smartpay-invoice-service` | P1 | Teslimat kanıtı (ePOD) imza doğrulama, dinamik navlun hesaplama (baz + yakıt + KDV), fatura yaşam döngüsü. |
-| **STORY-003** | [Ödeme Başlatma & Transactional Outbox](STORY-003-payment-initiation-outbox.md) | `smartpay-payment-service` | P1 | Çift katmanlı idempotency, Ledger gRPC entegrasyonu ile bloke koyma, `SKIP LOCKED` destekli Outbox event kaydı. |
-| **STORY-004** | [Taşımacı Faktoring & Erken Ödeme Worker'ı](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | Sanal thread (Virtual Thread) worker ile onaylanan faturaları tarama, faktoring komisyon kesintisi ve anında ödeme emri. |
-| **STORY-005** | [Banka Ekstresi & Otomatik Mutabakat Motoru](STORY-005-bank-reconciliation-engine.md) | `smartpay-recon-service` | P2 | ISO-20022 CAMT.053 XML / MT940 ekstre ayrıştırma, `end_to_end_id` ile defter kayıtlarına otomatik eşleştirme. |
-| **STORY-006** | [API Gateway & Dağıtık Idempotency Filtresi](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | SHA-256 request fingerprinting, iki katmanlı kilit mekanizması, ters proxy yönlendirme. |
+| **STORY-001** | [Double-Entry Ledger & Atomic Transfer Engine](STORY-001-ledger-double-entry-engine.md) | `smartpay-ledger-service` | P0 | Zero-sum journal posting, pessimistic balance locking, hold/release lifecycle, Ledger gRPC API. |
+| **STORY-002** | [Freight Invoicing & ePOD Pricing Engine](STORY-002-invoice-epod-pricing-engine.md) | `smartpay-invoice-service` | P1 | Delivery proof (ePOD) signature verification, automated freight pricing (base + fuel + VAT), multi-currency invoices. |
+| **STORY-003** | [Payment Initiation & Transactional Outbox](STORY-003-payment-initiation-outbox.md) | `smartpay-payment-service` | P1 | Two-tier idempotency, Ledger gRPC hold reservation, `SKIP LOCKED` outbox event persistence. |
+| **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | Virtual Thread worker polling approved invoices, applying 2.5% factoring fee, and executing instant payouts. |
+| **STORY-005** | [Bank Statement & Auto-Reconciliation Engine](STORY-005-bank-reconciliation-engine.md) | `smartpay-recon-service` | P2 | Ingesting CAMT.053 XML / MT940 statements, auto-matching lines via `end_to_end_id` against ledger journal entries. |
+| **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | SHA-256 request fingerprinting, two-tier locking, response caching, reverse proxy routing. |
 
 ---
 
-## 🛠️ Temel Geliştirici Kuralları
-1. **`smartpay-common` Kullanımı**: Para birimi için daima `Money`, kimlikler için `AccountId`, `InvoiceId` vb., istisnalar için `SmartpayDomainException` hiyerarşisi kullanılmalıdır.
-2. **gRPC İletişimi**: Servisler arası senkron çağrılarda REST yerine `smartpay-proto` stubs kullanılmalıdır. Detaylar için [gRPC Teknik Rehberi](../architecture/grpc-technical-guide.md)'ne bakınız.
-3. **Virtual Threads Güvenliği**: Uzun süren I/O işlemlerinde veya thread havuzlarında `Executors.newVirtualThreadPerTaskExecutor()` tercih edilmeli, `synchronized` metodlardan kaçınılmalıdır.
+## 🛠️ Core Engineering Guidelines
+1. **Always Use `smartpay-common`**:
+   * Monetary amounts must use `Money`.
+   * Identifiers must use `AccountId`, `InvoiceId`, `TransactionId`, etc.
+   * Domain errors must extend `SmartpayDomainException`.
+2. **Synchronous Inter-Service Calls**:
+   * Use gRPC client stubs generated from `smartpay-proto`. Refer to the [gRPC Technical Guide](../architecture/grpc-technical-guide.md).
+3. **Virtual Threads Safety**:
+   * Avoid `synchronized` methods to prevent carrier thread pinning (favor `ReentrantLock` or immutable records).
+   * Utilize `Executors.newVirtualThreadPerTaskExecutor()` for concurrent task pools.

@@ -1,27 +1,27 @@
-# ADR-004: İç Servisler Arası İletişimde gRPC (HTTP/2) Kullanımı
+# ADR-004: gRPC (HTTP/2) for Synchronous Inter-Service Communication
 
-## Durum
-**KABUL EDİLDİ**
+## Status
+**ACCEPTED**
 
-## Tarih
+## Date
 2026-09-05
 
-## Bağlam
-SmartPay mikroservisleri arasında (örneğin `payment-service` ile `ledger-service`, veya `payout-worker` ile `payment-service`) yoğun, düşük gecikmeli ve tip güvenli senkron RPC çağrılarına ihtiyaç duyulmaktadır. Klasik REST (JSON over HTTP/1.1):
-* Her istekte yeni TCP/TLS el sıkışması yapar.
-* Metin tabanlı JSON serileştirmesi yüksek CPU ve bant genişliği tüketir.
-* DTO değişikliklerinde çalışma zamanında (runtime) sessiz hatalara neden olabilir.
+## Context
+SmartPay microservices (such as `payment-service` and `ledger-service`) engage in high-frequency, low-latency synchronous RPC calls. Using traditional REST (JSON over HTTP/1.1):
+* Incurs high TCP/TLS handshake overhead per connection.
+* Wastes CPU cycles and network bandwidth parsing and serializing verbose text-based JSON.
+* Lacks compile-time schema validation across language or module boundaries, allowing breaking API drift.
 
-## Karar
-İç servisler arası senkron iletişimde **gRPC (Protocol Buffers over HTTP/2)** kullanılmasına karar verilmiştir:
-1. **Merkezi Kontrat Modülü (`smartpay-proto`)**: Tüm servislerin veri taşıyıcıları ve servis arayüzleri tek bir `.proto` reposunda toplanır; derleme anında Java Stub sınıfları otomatik üretilir.
-2. **HTTP/2 Multiplexing**: Tek bir TCP bağlantısı üzerinden aynı anda yüzlerce eşzamanlı istek taşınır.
-3. **İkili (Binary) Protobuf**: JSON'a kıyasla 5-10 kat daha hızlı serileştirme ve daha küçük paket boyutu sağlanır.
+## Decision
+Standardize on **gRPC over HTTP/2** with Protocol Buffers for all synchronous inter-service communication:
+1. **Centralized Contract Repository (`smartpay-proto`)**: All message formats and service definitions are maintained in `.proto` files, producing strongly-typed Java stubs at build time.
+2. **HTTP/2 Multiplexing**: Multiple concurrent requests flow over a single persistent TCP connection.
+3. **Binary Serialization**: Protocol Buffers yield 5-10x faster serialization and significantly smaller payloads than JSON.
 
-## Alternatifler
-* **REST (JSON/HTTP 1.1)**: Dış dünyaya açık API Gateway uç noktalarında istemci uyumluluğu için tutulmuş, iç ağda elenmiştir.
-* **Apache Thrift**: Topluluk ve bulut ekosistemi desteği gRPC kadar geniş değildir.
+## Alternatives Considered
+* **REST (JSON/HTTP 1.1)**: Retained at the public API Gateway for broad client compatibility, but excluded from internal service meshes.
+* **Apache Thrift**: Lacks the broad cloud-native ecosystem and Kubernetes ingress tooling available for gRPC.
 
-## Sonuçlar
-* **Olumlu**: Çok daha düşük ağ gecikmesi (<2ms iç ağ), derleme anında zorunlu API uyumluluğu, çift yönlü streaming yeteneği.
-* **Olumsuz**: Tarayıcılar doğrudan gRPC çağıramaz (API Gateway üzerinden REST -> gRPC köprüsü gerektirir); geliştiricilerin gRPC ve Protobuf araçlarına aşina olması gerekir.
+## Consequences
+* **Positive**: Sub-2ms internal RPC latency, guaranteed compile-time contract compatibility, native support for bidirectional streaming.
+* **Negative**: Browsers cannot call gRPC directly without gRPC-Web or an API Gateway translation proxy; developers must understand protobuf code generation lifecycles.

@@ -1,25 +1,25 @@
-# ADR-001: Modern Java 25 & Spring Boot 4.1 Seçimi
+# ADR-001: Adoption of Modern Java 25 & Spring Boot 4.1
 
-## Durum
-**KABUL EDİLDİ**
+## Status
+**ACCEPTED**
 
-## Tarih
+## Date
 2026-09-05
 
-## Bağlam
-SmartPay, mikro-saniye hassasiyetinde bakiye hareketleri, yüksek hacimli eşzamanlı ödemeler ve finansal doğruluk gerektiren bir lojistik ödeme platformudur. Geleneksel JVM mimarilerinde OS thread başına 1MB stack maliyeti, bloklayıcı I/O çağrılarında (veritabanı, gRPC, banka API'leri) thread havuzlarının hızla tükenmesine (thread starvation) yol açmaktadır. Ayrıca mutable (değiştirilebilir) sınıflar çok iş parçacıklı ortamlarda race condition riskini artırır.
+## Context
+SmartPay is a high-throughput, low-latency financial logistics platform requiring microsecond-level balance operations, zero-sum double-entry accounting, and robust concurrency. Traditional JVM architectures suffer from high operating system thread overhead (1MB stack per thread), leading to thread starvation during blocking I/O calls (databases, gRPC RPCs, partner bank APIs). Furthermore, mutable domain models introduce substantial race condition vulnerabilities in concurrent multi-threaded applications.
 
-## Karar
-Sistemin tüm servislerinde **Java 25** ve **Spring Boot 4.1** kullanılmasına karar verilmiştir:
-1. **Virtual Threads (Project Loom)**: İşletim sistemi thread'lerine bağlanmadan, milyonlarca eşzamanlı sanal thread ile asenkron karmaşasına girmeden blocking I/O yürütme.
-2. **Records & Immutability**: Domain modellerinin ve DTO'ların saf `record` olarak tanımlanmasıyla thread-safety ve sıfır boilerplate sağlanması.
-3. **Sealed Types & Pattern Matching**: Domain hatalarının derleme zamanında eksiksiz (`switch` exhaustiveness) yönetilmesi.
-4. **Spring Boot 4.1**: Sanal thread'leri yerel olarak destekleyen, Jakarta EE 11 ve modern Java derleyicisi ile tam optimize çalışan uygulama çatısı.
+## Decision
+Adopt **Java 25** and **Spring Boot 4.1** across all platform microservices:
+1. **Virtual Threads (Project Loom)**: Execute blocking I/O concurrently across lightweight virtual threads without pinning carrier threads or requiring complex reactive programming abstractions.
+2. **Records & Immutability**: Define domain models, DTOs, and value objects as Java `record` components to enforce immutability, thread-safety, and boilerplate-free value equality.
+3. **Sealed Types & Pattern Matching**: Leverage sealed hierarchies (`SmartpayDomainException`) to enforce compile-time exhaustive error handling via switch expressions.
+4. **Spring Boot 4.1**: Native integration with virtual threads, modern webmvc runtime optimizations, and Jakarta EE 11 alignment.
 
-## Alternatifler
-* **Java 17 / 21**: Virtual Threads erken aşamadaydı, Java 25 ile üretim olgunluğuna ulaştı.
-* **Go / Rust**: Yüksek performans sunsalar da zengin Java kurumsal bankacılık kütüphanesi (ISO-20022 parser'lar, Moneta JSR-354, Hibernate, ArchUnit) eksiktir.
+## Alternatives Considered
+* **Java 17 / 21**: Virtual Threads were preview/early-stage; Java 25 brings production stabilization and performance optimizations.
+* **Go / Rust**: High raw speed, but lacking the mature ecosystem of enterprise banking tools (ISO-20022 parsing, Moneta JSR-354, Spring Data JPA, ArchUnit).
 
-## Sonuçlar
-* **Olumlu**: Yüksek işlem kapasitesi (throughput), daha düşük bellek ayak izi, immutable domain modelleri sayesinde güvenli paralellik.
-* **Olumsuz**: Bazı eski kütüphaneler (`synchronized` blokları carrier thread pin edenler) elenmek zorunda kalındı; ArchUnit mimari testleri ile bu kurallar otomatik denetlenmektedir.
+## Consequences
+* **Positive**: High throughput under concurrent I/O, low memory consumption, thread-safe domain logic.
+* **Negative**: Legacy libraries using `synchronized` blocks that pin carrier threads must be avoided; automated ArchUnit fitness functions enforce these guardrails in CI.

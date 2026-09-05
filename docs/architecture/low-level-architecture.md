@@ -1,26 +1,26 @@
-# Düşük Seviye Mimari ve Tasarım (Low-Level Architecture)
+# Low-Level Design & Concurrency Algorithms
 
-Bu doküman, SmartPay platformundaki kritik algoritmaları, veritabanı kilit mekanizmalarını ve dağıtık sistem kalıplarını derinlemesine açıklar.
+This document describes the low-level concurrency mechanisms, database locking algorithms, and distributed consistency patterns in SmartPay.
 
 ---
 
-## 1. Eşzamanlılık ve Kilit Stratejileri (Concurrency & Locking)
+## 1. Concurrency Control & Database Locking Models
 
-Finansal hesap bakiyelerinde iki temel risk vardır:
-* **Race Condition (Çift Harcama / Double-Spending)**: Kullanıcının aynı anda iki istek göndererek bakiyesini eksiye düşürmesi.
-* **Deadlock (Karşılıklı Kilitlenme)**: A hesabından B hesabına ve B hesabından A hesabına aynı anda transfer yapılırken veritabanı kilitlerinin birbirini beklemesi.
+In financial ledger systems, two critical concurrency anomalies must be addressed:
+* **Race Conditions (Double-Spending)**: Simultaneous debit requests causing balances to breach zero.
+* **Deadlocks**: Concurrent transfers between accounts (e.g. Account A to Account B, and Account B to Account A) holding and waiting on competing row locks.
 
 ### A) Pessimistic Locking (`SELECT ... FOR UPDATE`)
-Bakiye düşümü, para transferi ve bloke koyma gibi kritik işlemlerde `PESSIMISTIC_WRITE` kilidi kullanılır:
+Balance deductions, funds transfers, and hold reservations acquire a `PESSIMISTIC_WRITE` lock:
 ```sql
 SELECT * FROM account_balances 
 WHERE account_id = :accountId 
 FOR UPDATE;
 ```
-Bu kilit, transaction tamamlanana kadar diğer thread'lerin o satırı okuyup değiştirmesini engeller.
+This blocks competing transactions on the same account row until the locking transaction commits or rolls back.
 
-### B) Deadlock Önleme Algoritması (Ordered Locking)
-İki hesap arasında transfer yapılırken kilitler daima hesap ID'lerinin doğal sıralamasına (lexicographical order) göre alınır:
+### B) Deadlock-Free Ordered Locking Algorithm
+When transferring funds between two accounts, locks are always acquired in strictly ascending order of their `AccountId`:
 
 ```java
 // AccountBalanceServiceImpl.java
@@ -28,22 +28,22 @@ public void transfer(AccountId source, AccountId target, Money amount) {
     AccountId firstLock = source.compareTo(target) < 0 ? source : target;
     AccountId secondLock = source.compareTo(target) < 0 ? target : source;
 
-    // Kilitler daima aynı alfabetik sırada alınır -> Deadlock imkansızlaşır!
+    // Both threads acquire locks in the identical order -> Cyclic deadlocks are mathematically impossible!
     AccountBalanceEntity b1 = balanceRepo.findByAccountIdWithLock(firstLock.value()).orElseThrow();
     AccountBalanceEntity b2 = balanceRepo.findByAccountIdWithLock(secondLock.value()).orElseThrow();
     
-    // ... Bakiye kontrolleri ve güncelleme ...
+    // ... Balance assertions and atomic deduction ...
 }
 ```
 
 ### C) Optimistic Locking (`@Version`)
-Sadece bakiye sorgulayan veya düşük çakışmalı okuma yapan servisler için `account_balances.version` kolonu ile optimistik kilitleme sağlanır.
+Read-mostly paths utilize the `account_balances.version` column to detect stale updates without database-level write locks.
 
 ---
 
-## 2. Çift Taraflı Muhasebe (Double-Entry Zero-Sum) Algoritması
+## 2. Double-Entry Zero-Sum Ledger Mechanics
 
-Sistemdeki her para hareketi bağımsız bir `journal_transaction` ve buna bağlı `journal_entries` satırlarından oluşur.
+Every financial movement consists of a header transaction (`journal_transactions`) and paired debit/credit lines (`journal_entries`).
 
 ```
                     ┌─────────────────────────────────┐
@@ -63,7 +63,7 @@ Sistemdeki her para hareketi bağımsız bir `journal_transaction` ve buna bağl
 └─────────────────────────────────┘ └─────────────────────────────────┘
 ```
 
-### Değişmez Doğrulama Kuralı:
+### Zero-Sum Validation Invariant:
 ```java
 Money totalDebit = entries.stream()
         .filter(e -> e.entryType() == EntryType.DEBIT)
@@ -82,42 +82,42 @@ if (!totalDebit.equals(totalCredit)) {
 
 ---
 
-## 3. İki Katmanlı Dağıtık Idempotency (Two-Tier Idempotency)
+## 3. Two-Tier Distributed Idempotency Mechanism
 
-Ağ kesintilerinde mükerrer ödemeleri önlemek için SHA-256 tabanlı iki aşamalı durum makinesi kullanılır:
+To prevent duplicate disbursements upon network retries, an SHA-256 fingerprinting state machine is enforced:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CheckRecord: İstek Geldi (tenant_id + key)
+    [*] --> CheckRecord: Request arrives (tenant_id + key)
     
-    CheckRecord --> NotFound: Kayıt Yok
-    CheckRecord --> Exists: Kayıt Var
+    CheckRecord --> NotFound: No record exists
+    CheckRecord --> Exists: Record exists
 
-    NotFound --> InsertProcessing: Status = PROCESSING olarak INSERT et
-    InsertProcessing --> ExecuteBusinessLogic: Kilit Başarılı
-    ExecuteBusinessLogic --> UpdateCompleted: Status = COMPLETED, ResponseBody sakla
-    UpdateCompleted --> [*]: Yanıtı Dön (HTTP 200/201)
+    NotFound --> InsertProcessing: INSERT status = PROCESSING
+    InsertProcessing --> ExecuteBusinessLogic: Lock acquired
+    ExecuteBusinessLogic --> UpdateCompleted: UPDATE status = COMPLETED, store ResponseBody
+    UpdateCompleted --> [*]: Return response (HTTP 200/201)
 
-    Exists --> ValidateHash: SHA-256 Gövde Kontrolü
-    ValidateHash --> HashMismatch: Hash Farklı
+    Exists --> ValidateHash: Verify SHA-256 Request Hash
+    ValidateHash --> HashMismatch: Hash differs
     HashMismatch --> [*]: 422 RequestHashMismatchException
 
-    ValidateHash --> CheckStatus: Hash Aynı
+    ValidateHash --> CheckStatus: Hash matches
     CheckStatus --> StatusProcessing: Status == PROCESSING
-    StatusProcessing --> [*]: 409 IdempotencyConflictException (İşlem Sürüyor)
+    StatusProcessing --> [*]: 409 IdempotencyConflictException (In-flight)
 
     CheckStatus --> StatusCompleted: Status == COMPLETED
-    StatusCompleted --> [*]: Kayıtlı Yanıtı Dön (X-Cache: IDEMPOTENT-HIT)
+    StatusCompleted --> [*]: Return cached response (X-Cache: IDEMPOTENT-HIT)
 ```
 
 ---
 
-## 4. Transactional Outbox & `SKIP LOCKED` Polling
+## 4. Transactional Outbox Pattern with `SKIP LOCKED` Polling
 
-Mikroservis veritabanına kayıt atarken aynı transaction içinde `transactional_outbox` tablosuna event yazar. Arka plan işçisi bu tabloyu yüksek performansla tarar:
+To guarantee At-Least-Once Kafka event delivery without distributed 2PC transactions, outbox rows are committed in the same database transaction as domain state:
 
 ```sql
--- Birden fazla worker aynı anda çalıştığında çakışmayı önleyen O(1) polling sorgusu:
+-- High-throughput, non-blocking polling across concurrent worker instances:
 SELECT * FROM transactional_outbox
 WHERE processed_at IS NULL
 ORDER BY created_at ASC
@@ -125,26 +125,26 @@ LIMIT 50
 FOR UPDATE SKIP LOCKED;
 ```
 
-* **`FOR UPDATE SKIP LOCKED`**: Başka bir sanal thread veya worker instance'ı tarafından o an işlenmekte olan satırları atlar, sıradaki ilk boş 50 satırı anında kilitler. Kilit bekleme süresi $0\text{ ms}$'dir.
-* Kafka'ya mesaj başarıyla iletildikten sonra:
+* **`FOR UPDATE SKIP LOCKED`**: Bypasses rows currently held by other workers and locks the next unlocked batch with zero wait time.
+* Once delivered to Kafka:
   ```sql
   UPDATE transactional_outbox SET processed_at = CURRENT_TIMESTAMP WHERE id IN (:ids);
   ```
 
 ---
 
-## 5. Banka Ekstresi Otomatik Mutabakat Motoru (CAMT.053 Matching)
+## 5. Bank Statement Auto-Reconciliation Algorithm (CAMT.053)
 
-ClearBank veya Barclays'ten gelen ISO-20022 XML ekstrelerindeki satırlar aşağıdaki algoritmayla eşleştirilir:
+Incoming bank statement lines from ClearBank or Barclays are reconciled against ledger records using the matching pipeline:
 
 ```
 Bank Statement Line:
 - EndToEndId: "E2E-LOAD-841-PAYOUT"
 - Amount: 97500 pence (975.00 GBP)
-- Type: DEBIT (Banka çıkışı)
+- Type: DEBIT (Outflow from platform bank account)
 
        │
-       ▼ Arama Algoritması: journal_transactions.idempotency_key == EndToEndId
+       ▼ Search Index: journal_transactions.idempotency_key == EndToEndId
        │
 Ledger Transaction Match:
 - IdempotencyKey: "E2E-LOAD-841-PAYOUT"
@@ -154,11 +154,11 @@ Ledger Transaction Match:
     - Carrier Account: CREDIT 975.00 GBP
 
        │
-       ▼ Doğrulama:
-       - Tutar Eşit mi? (975.00 == 975.00) -> EVET
-       - Para Birimi Eşit mi? (GBP == GBP) -> EVET
-       - Yön Uyumlu mu? (Bank DEBIT == Ledger Escrow DEBIT) -> EVET
+       ▼ Invariant Checks:
+       - Amount matches? (975.00 == 975.00) -> YES
+       - Currency matches? (GBP == GBP) -> YES
+       - Direction matches? (Bank DEBIT == Ledger Escrow DEBIT) -> YES
 
-Sonuç: bank_statement_lines.reconciliation_status = 'MATCHED'
-       bank_statement_lines.matched_entry_id = <entry_uuid>
+Result: bank_statement_lines.reconciliation_status = 'MATCHED'
+        bank_statement_lines.matched_entry_id = <entry_uuid>
 ```
