@@ -1,5 +1,8 @@
 package com.hozgan.smartpay.ledger.service;
 
+import com.hozgan.smartpay.common.event.LedgerTransactionPostedEvent;
+import com.hozgan.smartpay.common.model.id.IdempotencyKey;
+import com.hozgan.smartpay.common.model.id.TransactionId;
 import com.hozgan.smartpay.common.exception.AccountNotFoundException;
 import com.hozgan.smartpay.common.exception.CurrencyMismatchException;
 import com.hozgan.smartpay.common.exception.InsufficientFundsException;
@@ -13,6 +16,7 @@ import com.hozgan.smartpay.ledger.repository.AccountRepository;
 import com.hozgan.smartpay.ledger.repository.JournalTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +55,7 @@ public class AccountBalanceService {
     private final AccountBalanceRepository accountBalanceRepository;
     private final JournalTransactionRepository journalTransactionRepository;
     private final LedgerDomainService ledgerDomainService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // =========================================================================
     // TRANSFER
@@ -137,6 +142,14 @@ public class AccountBalanceService {
                 sourceAccountId, targetAccountId, amount,
                 referenceType, referenceId, idempotencyKey, description);
 
+
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(LedgerTransactionPostedEvent.of(
+                    TransactionId.of(tx.getId()),
+                    referenceType,
+                    referenceId,
+                    IdempotencyKey.of(idempotencyKey)));
+        }
         log.info("Transfer completed successfully: txId={}, sourceId={}, targetId={}, amount={}",
                 tx.getId(), sourceAccountId, targetAccountId, amount);
 
@@ -226,12 +239,20 @@ public class AccountBalanceService {
             balance.setUpdatedAt(Instant.now());
             accountBalanceRepository.save(balance);
             if (targetAccountId != null) {
-                ledgerDomainService.recordTransfer(
+                String resolvedRefType = referenceType != null ? referenceType : "HOLD_CAPTURE";
+                String resolvedRefId = referenceId != null ? referenceId : "HC-" + UUID.randomUUID();
+                String resolvedIdempKey = idempotencyKey != null ? idempotencyKey : "IDEMP-" + UUID.randomUUID();
+                JournalTransactionEntity tx = ledgerDomainService.recordTransfer(
                         sourceAccountId, targetAccountId, amount,
-                        referenceType != null ? referenceType : "HOLD_CAPTURE",
-                        referenceId != null ? referenceId : "HC-" + UUID.randomUUID(),
-                        idempotencyKey != null ? idempotencyKey : "IDEMP-" + UUID.randomUUID(),
-                        "Hold capture: " + referenceId);
+                        resolvedRefType, resolvedRefId, resolvedIdempKey,
+                        "Hold capture: " + resolvedRefId);
+                if (eventPublisher != null) {
+                    eventPublisher.publishEvent(LedgerTransactionPostedEvent.of(
+                            TransactionId.of(tx.getId()),
+                            resolvedRefType,
+                            resolvedRefId,
+                            IdempotencyKey.of(resolvedIdempKey)));
+                }
                 log.info("Captured hold on account {}: amount={}, credited to {}",
                         sourceAccountId, amount, targetAccountId);
             } else {

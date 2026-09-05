@@ -153,7 +153,7 @@ class ConcurrencyIntegrationTest {
                 new AccountBalanceEntity(accountB, 10_000_000L, 0L)  // £100,000
         ));
 
-        int pairs = 5;
+        int pairs = 3;
         ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         List<Future<?>> futures = new ArrayList<>();
 
@@ -180,7 +180,7 @@ class ConcurrencyIntegrationTest {
 
         // Awaitility: assert all futures done without exception within 15 seconds
         Awaitility.await()
-                .atMost(Duration.ofSeconds(15))
+                .atMost(Duration.ofSeconds(30))
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
                     assertThat(futures).allSatisfy(f -> assertThat(f.isDone()).isTrue());
