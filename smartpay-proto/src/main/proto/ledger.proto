@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package smartpay.ledger;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.hozgan.smartpay.proto.ledger";
+option java_outer_classname = "LedgerProto";
+
+service LedgerService {
+  // Queries the current cleared and hold balances of an account
+  rpc GetBalance (GetBalanceRequest) returns (GetBalanceResponse);
+
+  // Appends an immutable, zero-sum double-entry journal transaction
+  rpc PostJournalTransaction (PostJournalTransactionRequest) returns (PostJournalTransactionResponse);
+
+  // High-level atomic balance transfer between two accounts
+  rpc TransferFunds (TransferFundsRequest) returns (TransferFundsResponse);
+
+  // Places a temporary authorization hold on an account
+  rpc HoldFunds (HoldFundsRequest) returns (HoldFundsResponse);
+
+  // Releases a previously placed hold
+  rpc ReleaseHold (ReleaseHoldRequest) returns (ReleaseHoldResponse);
+}
+
+message GetBalanceRequest {
+  string account_id = 1;
+}
+
+message GetBalanceResponse {
+  string account_id = 1;
+  smartpay.common.MoneyProto cleared_balance = 2;
+  smartpay.common.MoneyProto hold_balance = 3;
+  smartpay.common.MoneyProto available_balance = 4;
+  int64 version = 5;
+}
+
+enum EntryTypeProto {
+  ENTRY_TYPE_UNSPECIFIED = 0;
+  DEBIT = 1;
+  CREDIT = 2;
+}
+
+message JournalEntryLineProto {
+  string account_id = 1;
+  EntryTypeProto entry_type = 2;
+  smartpay.common.MoneyProto amount = 3;
+}
+
+message PostJournalTransactionRequest {
+  string reference_type = 1;
+  string reference_id = 2;
+  string idempotency_key = 3;
+  string description = 4;
+  repeated JournalEntryLineProto entries = 5;
+}
+
+message PostJournalTransactionResponse {
+  string transaction_id = 1;
+  string status = 2;
+  int64 posted_at_epoch_ms = 3;
+}
+
+message TransferFundsRequest {
+  string source_account_id = 1;
+  string target_account_id = 2;
+  smartpay.common.MoneyProto amount = 3;
+  string reference = 4;
+  string idempotency_key = 5;
+}
+
+message TransferFundsResponse {
+  string transaction_id = 1;
+  string status = 2;
+  smartpay.common.MoneyProto source_new_available_balance = 3;
+}
+
+message HoldFundsRequest {
+  string account_id = 1;
+  smartpay.common.MoneyProto amount = 2;
+  string reference_id = 3;
+  string idempotency_key = 4;
+}
+
+message HoldFundsResponse {
+  string hold_id = 1;
+  smartpay.common.MoneyProto new_hold_balance = 2;
+  smartpay.common.MoneyProto new_available_balance = 3;
+}
+
+message ReleaseHoldRequest {
+  string account_id = 1;
+  string hold_id = 2;
+  smartpay.common.MoneyProto amount = 3;
+  bool capture = 4; // if true, debit cleared balance; if false, release hold back to available
+}
+
+message ReleaseHoldResponse {
+  string hold_id = 1;
+  bool captured = 2;
+  smartpay.common.MoneyProto new_available_balance = 3;
+}

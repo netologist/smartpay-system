@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package smartpay.payment;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.hozgan.smartpay.proto.payment";
+option java_outer_classname = "PaymentProto";
+
+service PaymentService {
+  // Initiates a payment (e.g. Faster Payments, Open Banking VRP)
+  rpc InitiatePayment (InitiatePaymentRequest) returns (InitiatePaymentResponse);
+
+  // Checks payment execution and settlement status
+  rpc GetPaymentStatus (GetPaymentStatusRequest) returns (GetPaymentStatusResponse);
+
+  // Confirms and settles an in-flight payment
+  rpc SettlePayment (SettlePaymentRequest) returns (SettlePaymentResponse);
+
+  // Reverses a failed or disputed payment
+  rpc ReversePayment (ReversePaymentRequest) returns (ReversePaymentResponse);
+}
+
+enum PaymentMethodProto {
+  PAYMENT_METHOD_UNSPECIFIED = 0;
+  FASTER_PAYMENTS = 1;
+  VARIABLE_RECURRING_PAYMENT = 2;
+  BACS = 3;
+  INTERNAL_TRANSFER = 4;
+}
+
+enum PaymentStatusProto {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  INITIATED = 1;
+  PROCESSING = 2;
+  AUTHORIZED = 3;
+  SETTLED = 4;
+  FAILED = 5;
+  REVERSED = 6;
+}
+
+message InitiatePaymentRequest {
+  string tenant_id = 1;
+  string idempotency_key = 2;
+  string debtor_account_id = 3;
+  string creditor_account_id = 4;
+  smartpay.common.MoneyProto amount = 5;
+  PaymentMethodProto payment_method = 6;
+  string payment_reference = 7;
+  string end_to_end_id = 8;
+}
+
+message InitiatePaymentResponse {
+  string payment_id = 1;
+  PaymentStatusProto status = 2;
+  string end_to_end_id = 3;
+  int64 initiated_at_epoch_ms = 4;
+}
+
+message GetPaymentStatusRequest {
+  string payment_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  string payment_id = 1;
+  PaymentStatusProto status = 2;
+  smartpay.common.MoneyProto amount = 3;
+  string end_to_end_id = 4;
+  int64 updated_at_epoch_ms = 5;
+  string failure_reason = 6;
+}
+
+message SettlePaymentRequest {
+  string payment_id = 1;
+  string settlement_reference = 2;
+  string idempotency_key = 3;
+}
+
+message SettlePaymentResponse {
+  string payment_id = 1;
+  PaymentStatusProto status = 2;
+  int64 settled_at_epoch_ms = 3;
+}
+
+message ReversePaymentRequest {
+  string payment_id = 1;
+  string reason = 2;
+  string idempotency_key = 3;
+}
+
+message ReversePaymentResponse {
+  string reversal_id = 1;
+  string payment_id = 2;
+  PaymentStatusProto status = 3;
+  int64 reversed_at_epoch_ms = 4;
+}

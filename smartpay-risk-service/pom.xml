@@ -9,7 +9,6 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 	<artifactId>smartpay-risk-service</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
 	<name>smartpay-risk-service</name>
 	<description/>
 

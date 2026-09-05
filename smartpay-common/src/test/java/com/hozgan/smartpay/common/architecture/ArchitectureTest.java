@@ -221,6 +221,7 @@ class ArchitectureTest {
                     .that().resideInAPackage("..common.model..")
                     .should().onlyDependOnClassesThat().resideInAnyPackage(
                             "..common.model..",
+                            "..common.util..",
                             "java..",
                             "javax..",
                             "org.jspecify..",

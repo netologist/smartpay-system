@@ -9,7 +9,6 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 	<artifactId>smartpay-notification-service</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
 	<name>smartpay-notification-service</name>
 	<description/>
 	<url/>

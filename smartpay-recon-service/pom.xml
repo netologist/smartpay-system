@@ -9,7 +9,6 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 	<artifactId>smartpay-recon-service</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
 	<name>smartpay-recon-service</name>
 	<description/>
 	<dependencies>
@@ -32,6 +31,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.hozgan.smartpay</groupId>
+			<artifactId>smartpay-common</artifactId>
 		</dependency>
 
 		<dependency>

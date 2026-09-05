@@ -9,7 +9,6 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 	<artifactId>smartpay-ledger-service</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
 	<name>smartpay-ledger-service</name>
 	<description/>
 
@@ -33,6 +32,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.hozgan.smartpay</groupId>
+			<artifactId>smartpay-common</artifactId>
 		</dependency>
 
 		<dependency>

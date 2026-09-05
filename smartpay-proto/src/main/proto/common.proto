@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package smartpay.common;
+
+option java_multiple_files = true;
+option java_package = "com.hozgan.smartpay.proto.common";
+option java_outer_classname = "CommonProto";
+
+// Representation of monetary amounts in minor units (pence / cents)
+message MoneyProto {
+  string currency = 1;         // ISO 4217 Currency Code (e.g. "GBP", "EUR", "USD")
+  int64 amount_in_pence = 2;   // Amount in minor units (e.g. 1050 for 10.50 GBP)
+}
+
+// Representation of UUIDv7 identifiers
+message UUIDProto {
+  string value = 1;            // Standard 36-char string representation of UUID
+}
+
+// Standard structured domain error payload
+message ErrorDetailProto {
+  string error_code = 1;
+  string message = 2;
+  int64 timestamp_epoch_ms = 3;
+}
