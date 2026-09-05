@@ -31,6 +31,8 @@
         <awaitility.version>4.3.0</awaitility.version>
         <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
         <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+        <moneta.version>1.4.5</moneta.version>
+        <archunit.version>1.4.1</archunit.version>
     </properties>
 
     <modules>
@@ -55,7 +57,7 @@
             </dependency>
             <dependency>
                 <groupId>com.hozgan.smartpay</groupId>
-                <artifactId>smartypay-common</artifactId>
+                <artifactId>smartpay-common</artifactId>
                 <version>${smartpay.version}</version>
             </dependency>
             <dependency>
@@ -143,6 +145,20 @@
                 <version>${awaitility.version}</version>
                 <scope>test</scope>
             </dependency>
+            <!-- JavaMoney Moneta -->
+            <dependency>
+                <groupId>org.javamoney</groupId>
+                <artifactId>moneta</artifactId>
+                <version>${moneta.version}</version>
+                <type>pom</type>
+            </dependency>
+            <!-- ArchUnit JUnit5 -->
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -163,6 +179,19 @@
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- JavaMoney Moneta -->
+        <dependency>
+            <groupId>org.javamoney</groupId>
+            <artifactId>moneta</artifactId>
+            <version>1.4.5</version>
+            <type>pom</type>
+        </dependency>
+        <!-- ArchUnit for Architecture Testing -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
