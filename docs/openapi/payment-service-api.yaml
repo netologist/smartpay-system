@@ -1,0 +1,114 @@
+openapi: 3.1.0
+info:
+  title: SmartPay Payment & Settlement API
+  version: 1.0.0
+  description: Payment initiation, Faster Payments / Open Banking VRP orchestration, and transactional outbox.
+servers:
+  - url: http://localhost:8082
+    description: Local Payment Service
+  - url: http://localhost:8080/api/v1/payments
+    description: Via API Gateway
+
+paths:
+  /api/v1/payments/initiate:
+    post:
+      summary: Initiate a payment with idempotency protection
+      operationId: initiatePayment
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Unique client key for 2-tier idempotency protection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiatePaymentRequest'
+      responses:
+        '201':
+          description: Payment initiated and outbox event published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '409':
+          description: Concurrent request in progress for this idempotency key
+        '422':
+          description: Request body hash does not match previous idempotent request
+
+  /api/v1/payments/{id}/status:
+    get:
+      summary: Get payment execution and settlement status
+      operationId: getPaymentStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          description: Payment not found
+
+components:
+  schemas:
+    InitiatePaymentRequest:
+      type: object
+      required:
+        - tenantId
+        - debtorAccountId
+        - creditorAccountId
+        - amountPence
+        - currency
+        - paymentMethod
+      properties:
+        tenantId:
+          type: string
+          example: "TENANT-UK-01"
+        debtorAccountId:
+          type: string
+          format: uuid
+        creditorAccountId:
+          type: string
+          format: uuid
+        amountPence:
+          type: integer
+          example: 97500
+        currency:
+          type: string
+          example: "GBP"
+        paymentMethod:
+          type: string
+          enum: [FASTER_PAYMENTS, VARIABLE_RECURRING_PAYMENT, BACS, INTERNAL_TRANSFER]
+        reference:
+          type: string
+          example: "PAYOUT-LOAD-841"
+
+    PaymentResponse:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [INITIATED, PROCESSING, AUTHORIZED, SETTLED, FAILED, REVERSED]
+        amountPence:
+          type: integer
+        currency:
+          type: string
+        endToEndId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time

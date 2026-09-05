@@ -1,0 +1,196 @@
+openapi: 3.1.0
+info:
+  title: SmartPay Freight Invoicing & ePOD API
+  version: 1.0.0
+  description: Electronic Proof of Delivery (ePOD) verification and freight invoice calculation engine.
+servers:
+  - url: http://localhost:8083
+    description: Local Invoice Service
+  - url: http://localhost:8080/api/v1/invoices
+    description: Via API Gateway
+
+paths:
+  /api/v1/epod/verify:
+    post:
+      summary: Verify Electronic Proof of Delivery (ePOD)
+      operationId: verifyEpod
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEpodRequest'
+      responses:
+        '201':
+          description: ePOD verified and recorded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EpodRecordResponse'
+        '400':
+          description: Invalid coordinates or malformed signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Load already has an existing verified ePOD
+
+  /api/v1/invoices:
+    post:
+      summary: Calculate and issue a new freight invoice
+      operationId: createInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '201':
+          description: Invoice issued successfully with calculated pricing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '422':
+          description: Pricing mismatch or currency error
+
+  /api/v1/invoices/{id}:
+    get:
+      summary: Get invoice details by ID
+      operationId: getInvoiceById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          description: Invoice not found
+
+components:
+  schemas:
+    VerifyEpodRequest:
+      type: object
+      required:
+        - loadId
+        - carrierId
+        - deliveredAt
+        - latitude
+        - longitude
+        - photoS3Url
+        - signatureHash
+      properties:
+        loadId:
+          type: string
+          example: "LOAD-2026-UK-0841"
+        carrierId:
+          type: string
+          format: uuid
+        deliveredAt:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 51.5074
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: -0.1278
+        photoS3Url:
+          type: string
+          format: uri
+          example: "https://s3.eu-west-2.amazonaws.com/smartpay-epod/loads/841.jpg"
+        signatureHash:
+          type: string
+          pattern: '^[a-fA-F0-9]{64}$'
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+    EpodRecordResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        loadId:
+          type: string
+        verified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - loadId
+        - shipperId
+        - carrierId
+        - vehicleType
+        - mileageMiles
+        - currency
+      properties:
+        loadId:
+          type: string
+        shipperId:
+          type: string
+          format: uuid
+        carrierId:
+          type: string
+          format: uuid
+        vehicleType:
+          type: string
+          enum: [VAN, LUTON, 7_5T, ARTIC]
+        mileageMiles:
+          type: number
+          example: 125.50
+        currency:
+          type: string
+          example: "GBP"
+
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        loadId:
+          type: string
+        currency:
+          type: string
+        baseAmountPence:
+          type: integer
+        fuelSurchargePence:
+          type: integer
+        vatAmountPence:
+          type: integer
+        totalAmountPence:
+          type: integer
+        status:
+          type: string
+          enum: [DRAFT, EPOD_VERIFIED, FACTORING_APPROVED, SETTLED, CANCELLED]
+
+    ErrorResponse:
+      type: object
+      properties:
+        errorCode:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

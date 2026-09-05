@@ -1,0 +1,97 @@
+openapi: 3.1.0
+info:
+  title: SmartPay Bank Statement Reconciliation API
+  version: 1.0.0
+  description: ISO-20022 CAMT.053 XML / MT940 statement ingestion and ledger reconciliation.
+servers:
+  - url: http://localhost:8084
+    description: Local Recon Service
+  - url: http://localhost:8080/api/v1/recon
+    description: Via API Gateway
+
+paths:
+  /api/v1/recon/statements/upload:
+    post:
+      summary: Upload bank statement file (CAMT.053 XML or MT940)
+      operationId: uploadStatement
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                bankName:
+                  type: string
+                  example: "ClearBank"
+      responses:
+        '201':
+          description: Statement parsed and ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatementUploadResponse'
+
+  /api/v1/recon/statements/{id}/lines:
+    get:
+      summary: Get statement lines and reconciliation statuses
+      operationId: getStatementLines
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statement lines retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StatementLineResponse'
+
+components:
+  schemas:
+    StatementUploadResponse:
+      type: object
+      properties:
+        statementId:
+          type: string
+          format: uuid
+        statementReference:
+          type: string
+        totalLinesParsed:
+          type: integer
+        openingBalancePence:
+          type: integer
+        closingBalancePence:
+          type: integer
+
+    StatementLineResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        endToEndId:
+          type: string
+        amountInPence:
+          type: integer
+        currency:
+          type: string
+        entryType:
+          type: string
+          enum: [DEBIT, CREDIT]
+        reconciliationStatus:
+          type: string
+          enum: [UNMATCHED, MATCHED, MANUALLY_ADJUSTED]
+        matchedEntryId:
+          type: string
+          format: uuid
+          nullable: true

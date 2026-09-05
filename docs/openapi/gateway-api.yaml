@@ -1,0 +1,66 @@
+openapi: 3.1.0
+info:
+  title: SmartPay Unified API Gateway
+  version: 1.0.0
+  description: Public entry-point for SmartPay Logistics Payment Platform with rate limiting, JWT authentication, and two-tier idempotency protection.
+servers:
+  - url: http://localhost:8080
+    description: Local API Gateway
+  - url: https://api.smartpay.internal
+    description: Production Kubernetes Cluster
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/v1/epod/verify:
+    post:
+      summary: Proxy to Invoice Service - Verify ePOD
+      tags: [Logistics & Invoicing]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        $ref: 'invoice-service-api.yaml#/paths/~1api~1v1~1epod~1verify/post/requestBody'
+      responses:
+        '201':
+          $ref: 'invoice-service-api.yaml#/paths/~1api~1v1~1epod~1verify/post/responses/201'
+
+  /api/v1/invoices:
+    post:
+      summary: Proxy to Invoice Service - Create Invoice
+      tags: [Logistics & Invoicing]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        $ref: 'invoice-service-api.yaml#/paths/~1api~1v1~1invoices/post/requestBody'
+      responses:
+        '201':
+          $ref: 'invoice-service-api.yaml#/paths/~1api~1v1~1invoices/post/responses/201'
+
+  /api/v1/payments/initiate:
+    post:
+      summary: Proxy to Payment Service - Initiate Payment
+      tags: [Payments & Settlement]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        $ref: 'payment-service-api.yaml#/paths/~1api~1v1~1payments~1initiate/post/requestBody'
+      responses:
+        '201':
+          $ref: 'payment-service-api.yaml#/paths/~1api~1v1~1payments~1initiate/post/responses/201'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Unique client key for two-tier SHA-256 idempotency protection
