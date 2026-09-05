@@ -2,6 +2,7 @@ package com.hozgan.smartpay.ledger.service;
 
 import com.hozgan.smartpay.common.exception.UnbalancedJournalTransactionException;
 import com.hozgan.smartpay.common.model.Money;
+import com.hozgan.smartpay.common.exception.CurrencyMismatchException;
 import com.hozgan.smartpay.common.model.enums.EntryType;
 import com.hozgan.smartpay.common.model.enums.JournalStatus;
 import com.hozgan.smartpay.ledger.entity.JournalEntryEntity;
@@ -13,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Currency;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -95,6 +98,63 @@ public class LedgerDomainService {
             String idempotencyKey,
             String description) {
         return recordTransfer(debitAccountId, creditAccountId, amount, referenceType, referenceId, idempotencyKey, description);
+    }
+
+    public record JournalEntryItem(UUID accountId, EntryType entryType, Money amount) {}
+
+    /**
+     * Records a multi-legged journal transaction enforcing the Luca Pacioli zero-sum invariant
+     * across all debit and credit lines.
+     */
+    public JournalTransactionEntity recordJournalTransaction(
+            String referenceType,
+            String referenceId,
+            String idempotencyKey,
+            String description,
+            List<JournalEntryItem> entries) {
+        if (entries == null || entries.isEmpty()) {
+            throw new IllegalArgumentException("Journal entries list cannot be empty");
+        }
+
+        Currency currency = entries.getFirst().amount().currency();
+        Money totalDebit = Money.zero(currency);
+        Money totalCredit = Money.zero(currency);
+
+        for (JournalEntryItem entry : entries) {
+            if (!entry.amount().currency().equals(currency)) {
+                throw new CurrencyMismatchException(currency, entry.amount().currency());
+            }
+            if (entry.entryType() == EntryType.DEBIT) {
+                totalDebit = totalDebit.plus(entry.amount());
+            } else if (entry.entryType() == EntryType.CREDIT) {
+                totalCredit = totalCredit.plus(entry.amount());
+            }
+        }
+
+        assertZeroSum(totalDebit, totalCredit);
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<JournalTransactionEntity> existing = journalTransactionRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Idempotent cache hit for journal transaction [{}] with key [{}]", existing.get().getId(), idempotencyKey);
+                return existing.get();
+            }
+        }
+
+        JournalTransactionEntity tx = new JournalTransactionEntity(
+                referenceType, referenceId, idempotencyKey, JournalStatus.POSTED, description);
+        journalTransactionRepository.save(tx);
+
+        List<JournalEntryEntity> lineEntities = entries.stream()
+                .map(e -> new JournalEntryEntity(
+                        tx.getId(), e.accountId(), e.entryType(),
+                        e.amount().toMinorUnits(), e.amount().currency().getCurrencyCode()))
+                .toList();
+
+        journalEntryRepository.saveAll(lineEntities);
+        log.info("Recorded multi-entry transaction [{}] with {} entries for ref [{}]",
+                tx.getId(), lineEntities.size(), referenceId);
+        return tx;
     }
 
     // -------------------------------------------------------------------------

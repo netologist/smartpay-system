@@ -21,6 +21,11 @@ spring:
       hibernate:
         format_sql: true
 
+
+grpc:
+  server:
+    enabled: true
+    port: 0
 logging:
   level:
     com.hozgan.smartpay.ledger: DEBUG

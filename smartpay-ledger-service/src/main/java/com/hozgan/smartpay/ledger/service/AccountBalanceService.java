@@ -225,14 +225,19 @@ public class AccountBalanceService {
             balance.setClearedBalancePence(balance.getClearedBalancePence() - amount.toMinorUnits());
             balance.setUpdatedAt(Instant.now());
             accountBalanceRepository.save(balance);
-
-            ledgerDomainService.recordTransfer(
-                    sourceAccountId, targetAccountId, amount,
-                    referenceType, referenceId, idempotencyKey,
-                    "Hold capture: " + referenceId);
-
-            log.info("Captured hold on account {}: amount={}, credited to {}",
-                    sourceAccountId, amount, targetAccountId);
+            if (targetAccountId != null) {
+                ledgerDomainService.recordTransfer(
+                        sourceAccountId, targetAccountId, amount,
+                        referenceType != null ? referenceType : "HOLD_CAPTURE",
+                        referenceId != null ? referenceId : "HC-" + UUID.randomUUID(),
+                        idempotencyKey != null ? idempotencyKey : "IDEMP-" + UUID.randomUUID(),
+                        "Hold capture: " + referenceId);
+                log.info("Captured hold on account {}: amount={}, credited to {}",
+                        sourceAccountId, amount, targetAccountId);
+            } else {
+                log.info("Captured hold on account {}: amount={} deducted from cleared balance",
+                        sourceAccountId, amount);
+            }
         } else {
             balance.setUpdatedAt(Instant.now());
             accountBalanceRepository.save(balance);
@@ -240,6 +245,15 @@ public class AccountBalanceService {
         }
 
         return balance;
+    }
+
+    @Transactional
+    public AccountBalanceEntity releaseHold(UUID sourceAccountId, Money amount, boolean capture) {
+        return releaseHold(
+                sourceAccountId, null, amount, capture,
+                capture ? "HOLD_CAPTURE" : "HOLD_CANCEL",
+                "HC-" + UUID.randomUUID(),
+                "IDEMP-REL-" + UUID.randomUUID());
     }
 
     // =========================================================================

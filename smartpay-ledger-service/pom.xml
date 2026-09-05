@@ -43,6 +43,20 @@
 			<groupId>com.hozgan.smartpay</groupId>
 			<artifactId>smartpay-common</artifactId>
 		</dependency>
+		<!-- gRPC & Protocol Buffer contracts -->
+		<dependency>
+			<groupId>com.hozgan.smartpay</groupId>
+			<artifactId>smartpay-proto</artifactId>
+		</dependency>
+		<!-- gRPC Server runtime (Netty HTTP/2) -->
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-netty-shaded</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-services</artifactId>
+		</dependency>
 		<!-- PostgreSQL JDBC driver -->
 		<dependency>
 			<groupId>org.postgresql</groupId>
@@ -58,6 +72,17 @@
 			<scope>test</scope>
 		</dependency>
 		<!-- @ServiceConnection: auto-wires Testcontainers datasource into Spring -->
+		<!-- gRPC testing support (in-process channel/server) -->
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-testing</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-inprocess</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-testcontainers</artifactId>

@@ -33,6 +33,11 @@ server:
   port: 8081
   shutdown: graceful
 
+grpc:
+  server:
+    enabled: true
+    port: ${GRPC_PORT:9091}
+
 management:
   endpoints:
     web:
