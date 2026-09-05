@@ -1,0 +1,27 @@
+# ==============================================================================
+# Spring Boot Configuration Profile: default / runtime (Multi-Node Web & Worker Pods)
+# Target: 5 to 50+ Concurrent Application Replicas in Kubernetes
+# Security: Principle of Least Privilege (DML User: SELECT, INSERT, UPDATE, DELETE)
+# ==============================================================================
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartpay_db}
+    username: ${DB_USER:smartpay_app_user}
+    password: ${DB_PASS:secure_app_password}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      leak-detection-threshold: 2000
+  # CRITICAL IN MULTI-NODE: Flyway is DISABLED on runtime pods!
+  # Prevents pod startup race conditions, pg_advisory_lock timeouts, and pod CrashLoopBackOff!
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: validate # Strictly VALIDATES that the K8s Migration Job ran successfully
+    properties:
+      hibernate:
+        default_batch_fetch_size: 50
+        jdbc:
+          batch_size: 50

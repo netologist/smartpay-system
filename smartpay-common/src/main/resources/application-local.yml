@@ -1,0 +1,43 @@
+# ==============================================================================
+# Spring Boot Configuration Profile: local (Local Development & Testing)
+# Purpose: Developer Workstation, Fast Local Boot, Automated Seed Data
+# Profile Activation: -Dspring.profiles.active=local
+# ==============================================================================
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:smartpay_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  # LOCAL DEVELOPMENT: Flyway is ENABLED
+  # Automatically sets up fresh schema and loads repeatable seed data on developer boot
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    # Loads both core production DDL (db/migration) and developer test fixtures (db/seed)
+    locations:
+      - classpath:db/migration
+      - classpath:db/seed
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Strictly validates against Flyway; never lets Hibernate touch DDL
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 50
+
+logging:
+  level:
+    tech.teg.smartpay: DEBUG
+    org.flywaydb: INFO
+    org.hibernate.SQL: DEBUG

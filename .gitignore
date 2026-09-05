@@ -1,0 +1,17 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Maven build output
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# OS
+Thumbs.db
+
+# Local-only design docs (not pushed)
+/DEVELOPER_GUIDE.md
+/PRD.md

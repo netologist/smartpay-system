@@ -1,0 +1,37 @@
+# ==============================================================================
+# Spring Boot Configuration Profile: prod (Production Multi-Node Pods)
+# Purpose: Live Production Runtime (Kubernetes Multi-Replica Pods)
+# Profile Activation: -Dspring.profiles.active=prod
+# ==============================================================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres.smartpay.svc.cluster.local}:${DB_PORT:5432}/${DB_NAME:smartpay_db}?sslmode=verify-full&sslrootcert=/etc/ssl/certs/db-ca.crt
+    # PRINCIPLE OF LEAST PRIVILEGE: DML-only user (SELECT, INSERT, UPDATE, DELETE)
+    # Production application pods NEVER receive DDL permissions!
+    username: ${DB_USER:smartpay_app_user}
+    password: ${DB_PASS:secure_app_password}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      leak-detection-threshold: 2000
+
+  # PRODUCTION MULTI-NODE: Flyway is STRICTLY DISABLED!
+  # Database migrations are executed strictly once via the Kubernetes Pre-Deployment Job (Sync Wave 1).
+  # Runtime pods MUST NOT run migrations on startup to prevent lock contention, probe timeouts, and pod CrashLoopBackOff!
+  # Seed data locations are strictly excluded in production.
+  flyway:
+    enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Strictly validates schema; fails fast if K8s Job did not run
+    show-sql: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 50
+        jdbc:
+          batch_size: 50
