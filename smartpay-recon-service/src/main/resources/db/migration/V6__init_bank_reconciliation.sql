@@ -11,6 +11,7 @@ CREATE TABLE bank_statements (
     bank_name VARCHAR(64) NOT NULL, -- e.g. 'ClearBank', 'Modulr', 'Barclays'
     account_number VARCHAR(32) NOT NULL,
     statement_date DATE NOT NULL,
+    currency VARCHAR(3) NOT NULL DEFAULT 'GBP',
     opening_balance_pence BIGINT NOT NULL,
     closing_balance_pence BIGINT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -26,6 +27,7 @@ CREATE TABLE bank_statement_lines (
     end_to_end_id VARCHAR(64) NOT NULL, -- Core matching key against Faster Payments transfer reference
     amount_in_pence BIGINT NOT NULL,
     entry_type VARCHAR(6) NOT NULL,
+    currency VARCHAR(3) NOT NULL DEFAULT 'GBP',
     booking_date DATE NOT NULL,
     reconciliation_status VARCHAR(16) NOT NULL DEFAULT 'UNMATCHED',
     matched_entry_id UUID NULL REFERENCES journal_entries(id) ON DELETE SET NULL,

@@ -37,6 +37,8 @@ public class BankStatementLineEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "entry_type", nullable = false, length = 6)
     private EntryType entryType;
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency = "GBP";
 
     @Column(name = "booking_date", nullable = false)
     private LocalDate bookingDate;
@@ -61,6 +63,7 @@ public class BankStatementLineEntity {
         this.statementReference = statementReference;
         this.endToEndId = endToEndId;
         this.amountInPence = amount.toMinorUnits();
+        this.currency = amount.currency().getCurrencyCode();
         this.entryType = entryType;
         this.bookingDate = bookingDate;
         this.reconciliationStatus = ReconciliationStatus.UNMATCHED;
@@ -118,6 +121,14 @@ public class BankStatementLineEntity {
     public LocalDate getBookingDate() {
         return bookingDate;
     }
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
 
     public void setBookingDate(LocalDate bookingDate) {
         this.bookingDate = bookingDate;

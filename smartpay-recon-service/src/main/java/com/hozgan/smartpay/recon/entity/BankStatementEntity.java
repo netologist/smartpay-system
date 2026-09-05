@@ -29,6 +29,8 @@ public class BankStatementEntity {
 
     @Column(name = "statement_date", nullable = false)
     private LocalDate statementDate;
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency = "GBP";
 
     @Column(name = "opening_balance_pence", nullable = false)
     private long openingBalancePence;
@@ -49,6 +51,7 @@ public class BankStatementEntity {
         this.bankName = bankName;
         this.accountNumber = accountNumber;
         this.statementDate = statementDate;
+        this.currency = openingBalance != null ? openingBalance.currency().getCurrencyCode() : "GBP";
         this.openingBalancePence = openingBalance.toMinorUnits();
         this.closingBalancePence = closingBalance.toMinorUnits();
         this.createdAt = Instant.now();
@@ -96,6 +99,14 @@ public class BankStatementEntity {
 
     public long getOpeningBalancePence() {
         return openingBalancePence;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public void setOpeningBalancePence(long openingBalancePence) {

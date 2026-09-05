@@ -29,6 +29,7 @@ CREATE TABLE invoices (
     carrier_id UUID NOT NULL,
     vehicle_type VARCHAR(16) NOT NULL,
     mileage_miles NUMERIC(8, 2) NOT NULL,
+    currency VARCHAR(3) NOT NULL DEFAULT 'GBP',
     base_amount_pence BIGINT NOT NULL,
     fuel_surcharge_pence BIGINT NOT NULL DEFAULT 0,
     vat_amount_pence BIGINT NOT NULL DEFAULT 0,

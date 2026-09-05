@@ -38,6 +38,8 @@ public class InvoiceEntity {
 
     @Column(name = "mileage_miles", nullable = false, precision = 8, scale = 2)
     private BigDecimal mileageMiles;
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency = "GBP";
 
     @Column(name = "base_amount_pence", nullable = false)
     private long baseAmountPence;
@@ -72,6 +74,7 @@ public class InvoiceEntity {
         this.carrierId = carrierId;
         this.vehicleType = vehicleType;
         this.mileageMiles = mileageMiles;
+        this.currency = pricing.baseAmount().currency().getCurrencyCode();
         this.baseAmountPence = pricing.baseAmount().toMinorUnits();
         this.fuelSurchargePence = pricing.fuelSurcharge().toMinorUnits();
         this.vatAmountPence = pricing.vatAmount().toMinorUnits();
@@ -186,12 +189,21 @@ public class InvoiceEntity {
         this.updatedAt = updatedAt;
     }
 
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
     public InvoicePricing getPricing() {
+        java.util.Currency cur = java.util.Currency.getInstance(currency);
         return new InvoicePricing(
-                Money.ofMinor(baseAmountPence, Money.GBP),
-                Money.ofMinor(fuelSurchargePence, Money.GBP),
-                Money.ofMinor(vatAmountPence, Money.GBP),
-                Money.ofMinor(totalAmountPence, Money.GBP)
+                Money.ofMinor(baseAmountPence, cur),
+                Money.ofMinor(fuelSurchargePence, cur),
+                Money.ofMinor(vatAmountPence, cur),
+                Money.ofMinor(totalAmountPence, cur)
         );
     }
 }
