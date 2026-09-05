@@ -9,6 +9,9 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.Instant;
 import java.util.Currency;
@@ -16,6 +19,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "journal_entries")
+@Getter
+@Setter
+@ToString
 public class JournalEntryEntity {
 
     @Id
@@ -52,62 +58,6 @@ public class JournalEntryEntity {
         this.amountInPence = amountInPence;
         this.currency = currency != null ? currency : "GBP";
         this.createdAt = Instant.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getTransactionId() {
-        return transactionId;
-    }
-
-    public void setTransactionId(UUID transactionId) {
-        this.transactionId = transactionId;
-    }
-
-    public UUID getAccountId() {
-        return accountId;
-    }
-
-    public void setAccountId(UUID accountId) {
-        this.accountId = accountId;
-    }
-
-    public EntryType getEntryType() {
-        return entryType;
-    }
-
-    public void setEntryType(EntryType entryType) {
-        this.entryType = entryType;
-    }
-
-    public long getAmountInPence() {
-        return amountInPence;
-    }
-
-    public void setAmountInPence(long amountInPence) {
-        this.amountInPence = amountInPence;
-    }
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
     }
 
     public Money getAmount() {

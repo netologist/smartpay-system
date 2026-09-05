@@ -6,6 +6,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.Instant;
 import java.util.Currency;
@@ -13,6 +17,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "account_balances")
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString
 public class AccountBalanceEntity {
 
     @Id
@@ -32,55 +40,12 @@ public class AccountBalanceEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
-    public AccountBalanceEntity() {
-    }
-
     public AccountBalanceEntity(UUID accountId, long clearedBalancePence, long holdBalancePence) {
         this.accountId = accountId;
         this.clearedBalancePence = clearedBalancePence;
         this.holdBalancePence = holdBalancePence;
         this.version = 0L;
         this.updatedAt = Instant.now();
-    }
-
-    public UUID getAccountId() {
-        return accountId;
-    }
-
-    public void setAccountId(UUID accountId) {
-        this.accountId = accountId;
-    }
-
-    public long getClearedBalancePence() {
-        return clearedBalancePence;
-    }
-
-    public void setClearedBalancePence(long clearedBalancePence) {
-        this.clearedBalancePence = clearedBalancePence;
-    }
-
-    public long getHoldBalancePence() {
-        return holdBalancePence;
-    }
-
-    public void setHoldBalancePence(long holdBalancePence) {
-        this.holdBalancePence = holdBalancePence;
-    }
-
-    public long getVersion() {
-        return version;
-    }
-
-    public void setVersion(long version) {
-        this.version = version;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public Money getClearedBalance(Currency currency) {

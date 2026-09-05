@@ -4,11 +4,12 @@ import com.hozgan.smartpay.common.exception.UnbalancedJournalTransactionExceptio
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.EntryType;
 import com.hozgan.smartpay.common.model.enums.JournalStatus;
-import com.hozgan.smartpay.ledger.entity.AccountBalanceEntity;
 import com.hozgan.smartpay.ledger.entity.JournalEntryEntity;
 import com.hozgan.smartpay.ledger.entity.JournalTransactionEntity;
 import com.hozgan.smartpay.ledger.repository.JournalEntryRepository;
 import com.hozgan.smartpay.ledger.repository.JournalTransactionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,17 +26,12 @@ import java.util.UUID;
  * those concerns belong to {@link AccountBalanceService}.
  */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class LedgerDomainService {
 
     private final JournalTransactionRepository journalTransactionRepository;
     private final JournalEntryRepository journalEntryRepository;
-
-    public LedgerDomainService(
-            JournalTransactionRepository journalTransactionRepository,
-            JournalEntryRepository journalEntryRepository) {
-        this.journalTransactionRepository = journalTransactionRepository;
-        this.journalEntryRepository = journalEntryRepository;
-    }
 
     /**
      * Persists the double-entry journal header and two immutable line items.
@@ -51,9 +47,7 @@ public class LedgerDomainService {
      * @param idempotencyKey  caller-supplied idempotency key stored on the transaction header
      * @param description     human-readable description for auditors
      * @return the saved {@link JournalTransactionEntity}
-     * @throws UnbalancedJournalTransactionException if debit != credit (should not occur
-     *                                               for a two-party transfer with equal amounts,
-     *                                               but guards against programmatic errors)
+     * @throws UnbalancedJournalTransactionException if debit != credit
      */
     public JournalTransactionEntity recordTransfer(
             UUID sourceAccountId,
@@ -63,6 +57,9 @@ public class LedgerDomainService {
             String referenceId,
             String idempotencyKey,
             String description) {
+
+        log.debug("Recording double-entry transfer: {} -> {}, amount={}, refType={}, refId={}",
+                sourceAccountId, targetAccountId, amount, referenceType, referenceId);
 
         assertZeroSum(amount, amount);
 
@@ -79,12 +76,15 @@ public class LedgerDomainService {
                 amount.toMinorUnits(), amount.currency().getCurrencyCode());
 
         journalEntryRepository.saveAll(List.of(debit, credit));
+
+        log.info("Recorded double-entry transaction [{}] with 2 balanced entries for amount {}",
+                tx.getId(), amount);
+
         return tx;
     }
 
     /**
-     * Persists a single DEBIT journal entry for a hold capture or fee deduction.
-     * The matching CREDIT side must be supplied by the caller as a separate entry.
+     * Persists a double-entry journal entry for a hold capture.
      */
     public JournalTransactionEntity recordHoldCapture(
             UUID debitAccountId,
@@ -103,13 +103,10 @@ public class LedgerDomainService {
 
     /**
      * Guards the double-entry zero-sum invariant.
-     *
-     * <p>For a vanilla two-party transfer both sides equal the transfer amount,
-     * so the check always passes. The overload with explicit debit/credit totals
-     * is used for multi-leg transactions (future: batch settlements).
      */
     void assertZeroSum(Money totalDebit, Money totalCredit) {
         if (!totalDebit.equals(totalCredit)) {
+            log.error("Zero-sum invariant violated! Total Debit: {}, Total Credit: {}", totalDebit, totalCredit);
             throw new UnbalancedJournalTransactionException(totalDebit, totalCredit);
         }
     }

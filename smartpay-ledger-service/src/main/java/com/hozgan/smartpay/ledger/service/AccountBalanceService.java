@@ -11,6 +11,8 @@ import com.hozgan.smartpay.ledger.entity.JournalTransactionEntity;
 import com.hozgan.smartpay.ledger.repository.AccountBalanceRepository;
 import com.hozgan.smartpay.ledger.repository.AccountRepository;
 import com.hozgan.smartpay.ledger.repository.JournalTransactionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,23 +43,14 @@ import java.util.UUID;
  * than a serialization failure.
  */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AccountBalanceService {
 
     private final AccountRepository accountRepository;
     private final AccountBalanceRepository accountBalanceRepository;
     private final JournalTransactionRepository journalTransactionRepository;
     private final LedgerDomainService ledgerDomainService;
-
-    public AccountBalanceService(
-            AccountRepository accountRepository,
-            AccountBalanceRepository accountBalanceRepository,
-            JournalTransactionRepository journalTransactionRepository,
-            LedgerDomainService ledgerDomainService) {
-        this.accountRepository = accountRepository;
-        this.accountBalanceRepository = accountBalanceRepository;
-        this.journalTransactionRepository = journalTransactionRepository;
-        this.ledgerDomainService = ledgerDomainService;
-    }
 
     // =========================================================================
     // TRANSFER
@@ -78,11 +71,15 @@ public class AccountBalanceService {
             String idempotencyKey,
             String description) {
 
+        log.debug("Initiating transfer: {} -> {}, amount={}, idempKey={}",
+                sourceAccountId, targetAccountId, amount, idempotencyKey);
+
         // --- Idempotency short-circuit ---
         Optional<JournalTransactionEntity> existing =
                 journalTransactionRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             JournalTransactionEntity cached = existing.get();
+            log.info("Idempotent cache hit for transaction [{}] with key [{}]", cached.getId(), idempotencyKey);
             AccountBalanceEntity srcBal = requireBalance(sourceAccountId);
             AccountBalanceEntity tgtBal = requireBalance(targetAccountId);
             Currency currency = resolveCurrency(sourceAccountId);
@@ -97,9 +94,13 @@ public class AccountBalanceService {
         Currency tgtCurrency = Currency.getInstance(tgtAccount.getCurrency());
 
         if (!srcCurrency.equals(tgtCurrency)) {
+            log.warn("Currency mismatch between source account {} ({}) and target account {} ({})",
+                    sourceAccountId, srcCurrency, targetAccountId, tgtCurrency);
             throw new CurrencyMismatchException(srcCurrency, tgtCurrency);
         }
         if (!srcCurrency.equals(amount.currency())) {
+            log.warn("Transfer currency {} does not match source account currency {}",
+                    amount.currency(), srcCurrency);
             throw new CurrencyMismatchException(srcCurrency, amount.currency());
         }
 
@@ -116,6 +117,8 @@ public class AccountBalanceService {
         // --- Invariant: sufficient available balance ---
         Money available = srcBal.getAvailableBalance(srcCurrency);
         if (available.isLessThan(amount)) {
+            log.warn("Insufficient funds for account {}. Available: {}, Requested: {}",
+                    sourceAccountId, available, amount);
             throw new InsufficientFundsException(AccountId.of(sourceAccountId), amount, available);
         }
 
@@ -134,6 +137,9 @@ public class AccountBalanceService {
                 sourceAccountId, targetAccountId, amount,
                 referenceType, referenceId, idempotencyKey, description);
 
+        log.info("Transfer completed successfully: txId={}, sourceId={}, targetId={}, amount={}",
+                tx.getId(), sourceAccountId, targetAccountId, amount);
+
         return buildResult(tx, srcBal, tgtBal, amount, srcCurrency);
     }
 
@@ -149,6 +155,8 @@ public class AccountBalanceService {
      */
     @Transactional
     public AccountBalanceEntity holdFunds(UUID accountId, Money amount) {
+        log.debug("Holding funds for account {}: amount={}", accountId, amount);
+
         AccountEntity account = requireAccount(accountId);
         Currency currency = Currency.getInstance(account.getCurrency());
 
@@ -160,12 +168,19 @@ public class AccountBalanceService {
         Money available = balance.getAvailableBalance(currency);
 
         if (available.isLessThan(amount)) {
+            log.warn("Insufficient funds to place hold on account {}. Available: {}, Requested: {}",
+                    accountId, available, amount);
             throw new InsufficientFundsException(AccountId.of(accountId), amount, available);
         }
 
         balance.setHoldBalancePence(balance.getHoldBalancePence() + amount.toMinorUnits());
         balance.setUpdatedAt(Instant.now());
-        return accountBalanceRepository.save(balance);
+        AccountBalanceEntity saved = accountBalanceRepository.save(balance);
+
+        log.info("Held {} on account {}. New hold balance: {} pence",
+                amount, accountId, saved.getHoldBalancePence());
+
+        return saved;
     }
 
     // =========================================================================
@@ -191,6 +206,9 @@ public class AccountBalanceService {
             String referenceId,
             String idempotencyKey) {
 
+        log.debug("Releasing hold on account {}: amount={}, capture={}, ref={}",
+                sourceAccountId, amount, capture, referenceId);
+
         AccountEntity account = requireAccount(sourceAccountId);
         Currency currency = Currency.getInstance(account.getCurrency());
 
@@ -212,9 +230,13 @@ public class AccountBalanceService {
                     sourceAccountId, targetAccountId, amount,
                     referenceType, referenceId, idempotencyKey,
                     "Hold capture: " + referenceId);
+
+            log.info("Captured hold on account {}: amount={}, credited to {}",
+                    sourceAccountId, amount, targetAccountId);
         } else {
             balance.setUpdatedAt(Instant.now());
             accountBalanceRepository.save(balance);
+            log.info("Cancelled hold on account {}: amount={}", sourceAccountId, amount);
         }
 
         return balance;

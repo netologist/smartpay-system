@@ -7,6 +7,8 @@ import com.hozgan.smartpay.ledger.dto.TransferResponse.MoneyView;
 import com.hozgan.smartpay.ledger.service.AccountBalanceService;
 import com.hozgan.smartpay.ledger.service.AccountBalanceService.TransferResult;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,27 +20,19 @@ import java.util.UUID;
  *
  * <p>All endpoints require an {@code Idempotency-Key} request header. Requests without
  * this header return {@code 400 Bad Request} before service logic is invoked.
- *
- * <p>Authentication (JWT / mTLS) is enforced by Spring Security (configured separately).
- * This controller is intentionally free of security annotations — auth is cross-cutting.
  */
 @RestController
 @RequestMapping("/api/v1/ledger")
+@RequiredArgsConstructor
+@Slf4j
 public class LedgerTransferController {
 
     private final AccountBalanceService accountBalanceService;
-
-    public LedgerTransferController(AccountBalanceService accountBalanceService) {
-        this.accountBalanceService = accountBalanceService;
-    }
 
     /**
      * POST /api/v1/ledger/transfers
      *
      * <p>Executes an atomic, deadlock-free, double-entry balance transfer between two accounts.
-     *
-     * <p>Required header: {@code Idempotency-Key} — a client-generated UUID or opaque key
-     * uniquely identifying this transfer request. Reusing the same key returns the cached result.
      *
      * @param idempotencyKey client-supplied deduplication key
      * @param request        transfer parameters (source, target, amount, reference)
@@ -48,6 +42,10 @@ public class LedgerTransferController {
     public ResponseEntity<TransferResponse> transfer(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestBody @Valid TransferRequest request) {
+
+        log.info("Received transfer request: idempotencyKey={}, sourceId={}, targetId={}, amountInPence={}, currency={}",
+                idempotencyKey, request.sourceAccountId(), request.targetAccountId(),
+                request.amountInPence(), request.currency());
 
         Currency currency = Currency.getInstance(request.currency());
         Money amount = Money.ofMinor(request.amountInPence(), currency);
@@ -60,6 +58,8 @@ public class LedgerTransferController {
                 request.referenceId(),
                 idempotencyKey,
                 request.description());
+
+        log.info("Transfer processed: transactionId={}, status={}", result.transactionId(), result.status());
 
         return ResponseEntity.ok(toResponse(request, result, currency));
     }
@@ -74,9 +74,8 @@ public class LedgerTransferController {
      */
     @GetMapping("/accounts/{accountId}/balance")
     public ResponseEntity<BalanceResponse> getBalance(@PathVariable UUID accountId) {
+        log.debug("Fetching balance for account {}", accountId);
         var balance = accountBalanceService.getBalance(accountId);
-        // currency is resolved from the sibling account row — for the balance query we
-        // default to GBP if the account entity is not eagerly loaded here.
         return ResponseEntity.ok(new BalanceResponse(
                 accountId.toString(),
                 balance.getClearedBalancePence(),

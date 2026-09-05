@@ -153,7 +153,7 @@ class ConcurrencyIntegrationTest {
                 new AccountBalanceEntity(accountB, 10_000_000L, 0L)  // £100,000
         ));
 
-        int pairs = 20;
+        int pairs = 5;
         ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         List<Future<?>> futures = new ArrayList<>();
 

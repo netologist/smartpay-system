@@ -8,12 +8,18 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "journal_transactions")
+@Getter
+@Setter
+@ToString
 public class JournalTransactionEntity {
 
     @Id
@@ -50,61 +56,5 @@ public class JournalTransactionEntity {
         this.status = status;
         this.description = description;
         this.postedAt = Instant.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public String getReferenceType() {
-        return referenceType;
-    }
-
-    public void setReferenceType(String referenceType) {
-        this.referenceType = referenceType;
-    }
-
-    public String getReferenceId() {
-        return referenceId;
-    }
-
-    public void setReferenceId(String referenceId) {
-        this.referenceId = referenceId;
-    }
-
-    public String getIdempotencyKey() {
-        return idempotencyKey;
-    }
-
-    public void setIdempotencyKey(String idempotencyKey) {
-        this.idempotencyKey = idempotencyKey;
-    }
-
-    public JournalStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(JournalStatus status) {
-        this.status = status;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public Instant getPostedAt() {
-        return postedAt;
-    }
-
-    public void setPostedAt(Instant postedAt) {
-        this.postedAt = postedAt;
     }
 }
