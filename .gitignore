@@ -11,7 +11,3 @@ target/
 
 # OS
 Thumbs.db
-
-# Local-only design docs (not pushed)
-/DEVELOPER_GUIDE.md
-/PRD.md
