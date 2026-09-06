@@ -1,0 +1,32 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-gateway-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-ledger-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-ledger-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-payment-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-payment-service

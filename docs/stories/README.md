@@ -7,21 +7,20 @@ This directory contains detailed, production-ready developer story cards for bui
 ## 🗺️ Story Map & Dependency Graph
 
 ```mermaid
-graph TD
-    STORY_001[STORY-001: Ledger Double-Entry Engine<br/>smartpay-ledger-service<br/><b>✅ COMPLETED</b>] --> STORY_003[STORY-003: Payment & Transactional Outbox<br/>smartpay-payment-service<br/><b>⏳ READY TO PLAY</b>]
-    STORY_001 --> STORY_005[STORY-005: Bank Statement Reconciliation<br/>smartpay-recon-service<br/><b>⏳ READY TO PLAY</b>]
+    STORY_001[STORY-001: Ledger Double-Entry Engine<br/>smartpay-ledger-service<br/><b>✅ COMPLETED</b>] --> STORY_003[STORY-003: Payment & Outbox Engine<br/>smartpay-payment-service<br/><b>✅ COMPLETED</b>]
+    STORY_001 --> STORY_005[STORY-005: Bank Reconciliation<br/>smartpay-recon-service<br/><b>⏳ READY TO PLAY</b>]
     
-    STORY_002[STORY-002: Invoice & ePOD Pricing Engine<br/>smartpay-invoice-service<br/><b>✅ COMPLETED</b>] --> STORY_004[STORY-004: Payout Factoring Worker<br/>smartpay-payout-worker<br/><b>🔒 BLOCKED</b>]
+    STORY_002[STORY-002: Invoice & ePOD Pricing Engine<br/>smartpay-invoice-service<br/><b>✅ COMPLETED</b>] --> STORY_004[STORY-004: Factoring Payout Worker<br/>smartpay-payout-worker<br/><b>⏳ READY TO PLAY</b>]
     STORY_003 --> STORY_004
-    STORY_003 --> STORY_006[STORY-006: Distributed Idempotency Gateway<br/>smartpay-gateway<br/><b>🔒 BLOCKED</b>]
-
+    STORY_003 --> STORY_006[STORY-006: Distributed Idempotency Gateway<br/>smartpay-gateway<br/><b>⏳ READY TO PLAY</b>]
+    STORY_007[STORY-007: Risk & Fraud Engine<br/>smartpay-risk-service<br/><b>⏳ READY TO PLAY</b>] --> STORY_004
+    STORY_003 --> STORY_008[STORY-008: Notification Engine<br/>smartpay-notification-service<br/><b>⏳ READY TO PLAY</b>]
     classDef completed fill:#2e7d32,stroke:#1b5e20,color:#fff,stroke-width:2px;
     classDef ready fill:#1565c0,stroke:#0d47a1,color:#fff,stroke-width:2px;
     classDef blocked fill:#616161,stroke:#424242,color:#fff,stroke-width:2px;
 
-    class STORY_001,STORY_002 completed;
-    class STORY_003,STORY_005 ready;
-    class STORY_004,STORY_006 blocked;
+    class STORY_001,STORY_002,STORY_003 completed;
+    class STORY_004,STORY_005,STORY_006,STORY_007,STORY_008 ready;
 ```
 
 ---
@@ -32,10 +31,15 @@ graph TD
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **STORY-001** | [Double-Entry Ledger & Atomic Transfer Engine](STORY-001-ledger-double-entry-engine.md) | `smartpay-ledger-service` | P0 | ✅ **Completed** | Zero-sum journal posting, pessimistic balance locking, hold/release lifecycle, Ledger gRPC API on Virtual Threads. |
 | **STORY-002** | [Freight Invoicing & ePOD Pricing Engine](STORY-002-invoice-epod-pricing-engine.md) | `smartpay-invoice-service` | P1 | ✅ **Completed** | Delivery proof (ePOD) cryptographic verification, automated freight pricing (base + fuel + VAT), multi-currency invoices. |
-| **STORY-003** | [Payment Initiation & Transactional Outbox](STORY-003-payment-initiation-outbox.md) | `smartpay-payment-service` | P1 | ⏳ **Ready to Play** | Two-tier idempotency, Ledger gRPC hold reservation, `SKIP LOCKED` transactional outbox event persistence. |
-| **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | 🔒 **Blocked** | Virtual Thread worker polling approved invoices, applying 2.5% factoring fee, and executing instant payouts. |
+| **STORY-003** | [Payment Initiation & Transactional Outbox](STORY-003-payment-initiation-outbox.md) | `smartpay-payment-service` | P1 | ✅ **Completed** | Two-tier idempotency, Ledger gRPC hold reservation, `SKIP LOCKED` transactional outbox event persistence. |
+| **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | ⏳ **Ready to Play** | Virtual Thread worker polling approved invoices, applying 2.5% factoring fee, and executing instant payouts. |
 | **STORY-005** | [Bank Statement & Auto-Reconciliation Engine](STORY-005-bank-reconciliation-engine.md) | `smartpay-recon-service` | P2 | ⏳ **Ready to Play** | Ingesting CAMT.053 XML / MT940 statements, auto-matching lines via `end_to_end_id` against ledger journal entries. |
-| **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | 🔒 **Blocked** | SHA-256 request fingerprinting, two-tier locking, response caching, reverse proxy routing. |
+| **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | ⏳ **Ready to Play** | SHA-256 request fingerprinting, two-tier locking, response caching, reverse proxy routing. |
+| **STORY-007** | [Carrier Credit Risk & Fraud Evaluation Engine](STORY-007-carrier-risk-fraud-engine.md) | `smartpay-risk-service` | P1 | ⏳ **Ready to Play** | Carrier credit scoring, exposure limit checks, multi-factor fraud detection gRPC API. |
+| **STORY-008** | [Event-Driven Multi-Channel Notification Engine](STORY-008-event-driven-notifications.md) | `smartpay-notification-service` | P2 | ⏳ **Ready to Play** | Consumer group processing of payment/invoice events, templated SMS/Email dispatch, idempotency, DLQ. |
+| **STORY-INFRA-001** | [Containerization & K8s Kustomize Engine](STORY-INFRA-001-containerization-kustomize-manifests.md) | `k8s/`, `docker/` | P0 | ⏳ **Ready to Play** | Distroless Java 25 multi-stage Dockerfiles, Kustomize base & overlays (dev/staging/prod). |
+| **STORY-INFRA-002** | [Enterprise CI Pipeline Automation](STORY-INFRA-002-ci-pipeline-automation.md) | `.github/workflows/` | P0 | ⏳ **Ready to Play** | PR matrix validation, unit/integration partitioning, Trivy CVE scanning, GHCR publishing. |
+| **STORY-INFRA-003** | [KinD Ephemeral Cluster & E2E Testing](STORY-INFRA-003-kind-e2e-testing-pipeline.md) | `.github/workflows/`, `scripts/ci/` | P1 | ⏳ **Ready to Play** | Multi-node KinD cluster, PostgreSQL & Redpanda bootstrap, Kustomize deploy, automated E2E tests. |
 
 ---
 

@@ -1,0 +1,108 @@
+name: "E2E - Ephemeral KinD Cluster & Smoke Tests"
+
+on:
+  pull_request:
+    paths:
+      - "k8s/**"
+      - "docker/**"
+      - "scripts/ci/**"
+      - ".github/workflows/e2e-kind.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kind-e2e-tests:
+    name: "KinD Multi-Node Cluster E2E Suite"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "25"
+          cache: "maven"
+
+      - name: Create KinD Cluster
+        uses: helm/kind-action@v1.12.0
+        with:
+          config: scripts/ci/kind-config.yaml
+          cluster_name: smartpay-cluster
+          wait: 120s
+
+      - name: Verify KinD Nodes
+        run: |
+          kubectl get nodes -o wide
+          kubectl cluster-info
+
+      - name: Deploy In-Cluster PostgreSQL 16
+        run: |
+          kubectl create namespace smartpay --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create database application & DDL secrets
+          kubectl create secret generic smartpay-db-app-credentials \
+            --namespace smartpay \
+            --from-literal=username=smartpay \
+            --from-literal=password=smartpay \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic smartpay-db-ddl-credentials \
+            --namespace smartpay \
+            --from-literal=username=smartpay \
+            --from-literal=password=smartpay \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Deploy PostgreSQL 16
+          kubectl run postgres --image=postgres:16-alpine \
+            --namespace smartpay \
+            --port=5432 \
+            --env="POSTGRES_USER=smartpay" \
+            --env="POSTGRES_PASSWORD=smartpay" \
+            --env="POSTGRES_DB=smartpay_db" \
+            --labels="app=postgres"
+
+          kubectl expose pod postgres --namespace smartpay --port=5432 --target-port=5432
+
+          echo "Waiting for PostgreSQL to become ready..."
+          kubectl wait --namespace smartpay --for=condition=Ready pod/postgres --timeout=90s
+
+      - name: Build Local Payment & Ledger Images
+        run: |
+          echo "Building local payment service image for KinD..."
+          docker build -t ghcr.io/hozgan/smartpay/smartpay-payment-service:latest \
+            --build-arg MODULE_NAME=smartpay-payment-service \
+            -f docker/Dockerfile .
+
+          echo "Loading image into KinD cluster..."
+          kind load docker-image ghcr.io/hozgan/smartpay/smartpay-payment-service:latest \
+            --name smartpay-cluster
+
+      - name: Deploy Microservices via Kustomize
+        run: |
+          kubectl apply -k k8s/overlays/dev
+          
+          echo "Checking deployment rollout status..."
+          kubectl get deployments -n smartpay
+
+      - name: Port-Forward & Run E2E Smoke Tests
+        run: |
+          # Forward payment-service port for E2E validation
+          kubectl port-forward svc/smartpay-payment-service -n smartpay 8082:8082 &
+          PF_PID=$!
+
+          # Allow port-forward to establish
+          sleep 5
+
+          # Execute automated smoke test suite
+          chmod +x scripts/ci/e2e-smoke-test.sh
+          BASE_URL="http://localhost:8082" ./scripts/ci/e2e-smoke-test.sh
+
+          # Cleanup port-forward background job
+          kill -9 ${PF_PID} || true
