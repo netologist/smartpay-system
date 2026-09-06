@@ -37,9 +37,9 @@ This directory contains detailed, production-ready developer story cards for bui
 | **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | ⏳ **Ready to Play** | SHA-256 request fingerprinting, two-tier locking, response caching, reverse proxy routing. |
 | **STORY-007** | [Carrier Credit Risk & Fraud Evaluation Engine](STORY-007-carrier-risk-fraud-engine.md) | `smartpay-risk-service` | P1 | ⏳ **Ready to Play** | Carrier credit scoring, exposure limit checks, multi-factor fraud detection gRPC API. |
 | **STORY-008** | [Event-Driven Multi-Channel Notification Engine](STORY-008-event-driven-notifications.md) | `smartpay-notification-service` | P2 | ⏳ **Ready to Play** | Consumer group processing of payment/invoice events, templated SMS/Email dispatch, idempotency, DLQ. |
-| **STORY-INFRA-001** | [Containerization & K8s Kustomize Engine](STORY-INFRA-001-containerization-kustomize-manifests.md) | `k8s/`, `docker/` | P0 | ⏳ **Ready to Play** | Distroless Java 25 multi-stage Dockerfiles, Kustomize base & overlays (dev/staging/prod). |
-| **STORY-INFRA-002** | [Enterprise CI Pipeline Automation](STORY-INFRA-002-ci-pipeline-automation.md) | `.github/workflows/` | P0 | ⏳ **Ready to Play** | PR matrix validation, unit/integration partitioning, Trivy CVE scanning, GHCR publishing. |
-| **STORY-INFRA-003** | [KinD Ephemeral Cluster & E2E Testing](STORY-INFRA-003-kind-e2e-testing-pipeline.md) | `.github/workflows/`, `scripts/ci/` | P1 | ⏳ **Ready to Play** | Multi-node KinD cluster, PostgreSQL & Redpanda bootstrap, Kustomize deploy, automated E2E tests. |
+| **TECH-001** | [Containerization & K8s Kustomize Engine](TECH-001-containerization-kustomize-manifests.md) | `k8s/`, `docker/` | P0 | ⏳ **Ready to Play** | Distroless Java 25 multi-stage Dockerfiles, Kustomize base & overlays (dev/staging/prod). |
+| **TECH-002** | [Enterprise CI Pipeline Automation](TECH-002-ci-pipeline-automation.md) | `.github/workflows/` | P0 | ⏳ **Ready to Play** | PR matrix validation, unit/integration partitioning, Trivy CVE scanning, GHCR publishing. |
+| **TECH-003** | [KinD Ephemeral Cluster & E2E Testing](TECH-003-kind-e2e-testing-pipeline.md) | `.github/workflows/`, `scripts/ci/` | P1 | ⏳ **Ready to Play** | Multi-node KinD cluster, PostgreSQL & Redpanda bootstrap, Kustomize deploy, automated E2E tests. |
 
 ---
 

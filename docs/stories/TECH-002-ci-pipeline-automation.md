@@ -1,4 +1,4 @@
-# STORY-INFRA-002: Enterprise CI Pipeline Automation with GitHub Actions
+# TECH-002: Enterprise CI Pipeline Automation with GitHub Actions
 
 ## 📌 Story Overview
 * **Target Directory**: `.github/workflows/`

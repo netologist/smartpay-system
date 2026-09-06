@@ -1,4 +1,4 @@
-# STORY-INFRA-003: Ephemeral KinD Cluster & Cloud-Native E2E Integration Suite
+# TECH-003: Ephemeral KinD Cluster & Cloud-Native E2E Integration Suite
 
 ## 📌 Story Overview
 * **Target Directory**: `.github/workflows/e2e-kind.yml`, `scripts/ci/`, `tests/e2e/`

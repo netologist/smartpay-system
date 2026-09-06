@@ -1,4 +1,4 @@
-# STORY-INFRA-001: Cloud-Native Containerization & Kubernetes Kustomize Engine
+# TECH-001: Cloud-Native Containerization & Kubernetes Kustomize Engine
 
 ## 📌 Story Overview
 * **Target Directory**: `docker/`, `k8s/`
