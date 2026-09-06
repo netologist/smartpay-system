@@ -11,7 +11,3 @@ target/
 
 # OS
 Thumbs.db
-
-# Agent tool configs
-.agents/
-skills-lock.json

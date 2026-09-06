@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "skills": {
+    "java-architect": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/java-architect/SKILL.md",
+      "computedHash": "02a7bcc716c9338aedcb0727be38a86d6addbadb1c17b485d019f654d2b04af6"
+    },
+    "java-coding-standards": {
+      "source": "affaan-m/ecc",
+      "sourceType": "github",
+      "skillPath": "skills/java-coding-standards/SKILL.md",
+      "computedHash": "c45cf8f0b87d44804e582fe0d103e154214961bcae4c5e1cb473d2f20d529096"
+    },
+    "java-docs": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/java-docs/SKILL.md",
+      "computedHash": "76cf49efcd6e99d95031c78e56615dbaf641a756e852acf7e87f9197dfab43e0"
+    },
+    "java-fundamentals": {
+      "source": "pluginagentmarketplace/custom-plugin-java",
+      "sourceType": "github",
+      "skillPath": "skills/java-fundamentals/SKILL.md",
+      "computedHash": "b817b238a8d2b4e55523df667fcdc66e36c9c4c43257eaf423b0d0f083088225"
+    },
+    "java-junit": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/java-junit/SKILL.md",
+      "computedHash": "fbf3cb0d47ffb44bdb6e1ebcc4d89dd7083208efdfc5b88f316c8bc2b58250b5"
+    },
+    "java-maven": {
+      "source": "pluginagentmarketplace/custom-plugin-java",
+      "sourceType": "github",
+      "skillPath": "skills/java-maven/SKILL.md",
+      "computedHash": "ab7e888f64840a6db0e6f99b8aeed5d47d18214f6a72db36100272fcae8fcf41"
+    },
+    "java-spring-boot": {
+      "source": "pluginagentmarketplace/custom-plugin-java",
+      "sourceType": "github",
+      "skillPath": "skills/java-spring-boot/SKILL.md",
+      "computedHash": "93e5a124d8d5f29e0b19692d431452f8b6c2a2e1c3e05c0f93f07fb2473ab32a"
+    },
+    "java-spring-development": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "skillPath": "java-spring-development/SKILL.md",
+      "computedHash": "d2f82b82003dcd350cf6ad9622e787c658a2d161958a75d0e44a8de2c71f9175"
+    },
+    "java-springboot": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/java-springboot/SKILL.md",
+      "computedHash": "f1b9c6b1277178fc33e5a612761c1cd1cf6ab5f946d05d69d52026d142c0a0c1"
+    }
+  }
+}
