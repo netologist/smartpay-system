@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package smartpay.risk;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.hozgan.smartpay.proto.risk";
+option java_outer_classname = "RiskProto";
+
+service RiskService {
+  // Evaluates carrier credit risk, factoring ceilings, and fraud propensity
+  rpc EvaluateCarrierRisk (EvaluateCarrierRiskRequest) returns (EvaluateCarrierRiskResponse);
+}
+
+enum RiskTierProto {
+  RISK_TIER_UNSPECIFIED = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+  CRITICAL = 4;
+}
+
+message EvaluateCarrierRiskRequest {
+  string carrier_id = 1;
+  string shipper_id = 2;
+  smartpay.common.MoneyProto invoice_amount = 3;
+}
+
+message EvaluateCarrierRiskResponse {
+  string carrier_id = 1;
+  int32 risk_score = 2; // 0 to 100
+  RiskTierProto risk_tier = 3;
+  bool approved = 4;
+  string reasoning = 5;
+}

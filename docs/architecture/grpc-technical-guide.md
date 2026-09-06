@@ -33,11 +33,16 @@ long pence = moneyProto.getAmountInPence();
 ```
 
 ### B) Service Grpc Classes (Client & Server Stubs)
-For `service LedgerService` defined in `ledger.proto`:
-* `LedgerServiceGrpc.LedgerServiceImplBase`: The abstract server class to extend when implementing the service.
-* `LedgerServiceGrpc.LedgerServiceBlockingStub`: The synchronous client stub used for blocking RPC calls.
-* `LedgerServiceGrpc.LedgerServiceStub`: The asynchronous, reactive client stub.
-
+The platform exposes three primary gRPC service interfaces defined in `smartpay-proto/src/main/proto/`:
+1. **`LedgerService` (`ledger.proto`)**:
+   * `LedgerServiceGrpc.LedgerServiceImplBase`: The abstract server class to extend when implementing `smartpay-ledger-service`.
+   * `LedgerServiceGrpc.LedgerServiceBlockingStub`: The synchronous client stub for balance queries, holds, and double-entry transfers.
+2. **`RiskService` (`risk.proto`)**:
+   * `RiskServiceGrpc.RiskServiceImplBase`: The abstract server class for implementing `smartpay-risk-service`.
+   * `RiskServiceGrpc.RiskServiceBlockingStub`: Synchronous client stub used by `smartpay-payout-worker` to evaluate carrier creditworthiness (`EvaluateCarrierRisk`).
+3. **`PaymentService` (`payment.proto`)**:
+   * `PaymentServiceGrpc.PaymentServiceImplBase`: The abstract server class for implementing `smartpay-payment-service`.
+   * `PaymentServiceGrpc.PaymentServiceBlockingStub`: Synchronous client stub used by workers to initiate disbursements (`InitiatePayment`).
 ---
 
 ## 3. Implementing a gRPC Server in Spring Boot
