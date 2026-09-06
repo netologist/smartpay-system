@@ -1,6 +1,8 @@
 package com.hozgan.smartpay.invoice.web;
 
 import com.hozgan.smartpay.common.model.enums.InvoiceStatus;
+import com.hozgan.smartpay.common.model.id.InvoiceId;
+import com.hozgan.smartpay.common.model.id.LoadId;
 import com.hozgan.smartpay.invoice.dto.request.CreateInvoiceRequest;
 import com.hozgan.smartpay.invoice.dto.response.InvoiceResponse;
 import com.hozgan.smartpay.invoice.entity.InvoiceEntity;
@@ -56,20 +58,23 @@ public class InvoiceController {
 
     @GetMapping("/{id}")
     public ResponseEntity<InvoiceResponse> getInvoiceById(@PathVariable UUID id) {
-        InvoiceEntity invoice = invoiceService.getInvoiceById(id);
+        InvoiceId invoiceId = InvoiceId.of(id);
+        InvoiceEntity invoice = invoiceService.getInvoiceById(invoiceId);
         return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 
     @GetMapping("/load/{loadId}")
     public ResponseEntity<InvoiceResponse> getInvoiceByLoadId(@PathVariable String loadId) {
-        InvoiceEntity invoice = invoiceService.getInvoiceByLoadId(loadId);
+        LoadId typedLoadId = LoadId.of(loadId);
+        InvoiceEntity invoice = invoiceService.getInvoiceByLoadId(typedLoadId);
         return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<InvoiceResponse> cancelInvoice(@PathVariable UUID id) {
         log.info("Requesting cancellation for invoice: {}", id);
-        InvoiceEntity invoice = invoiceService.cancelInvoice(id);
+        InvoiceId invoiceId = InvoiceId.of(id);
+        InvoiceEntity invoice = invoiceService.cancelInvoice(invoiceId);
         return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 
@@ -77,7 +82,8 @@ public class InvoiceController {
     public ResponseEntity<InvoiceResponse> updateStatus(@PathVariable UUID id,
                                                         @RequestParam("status") InvoiceStatus status) {
         log.info("Updating status for invoice {} to {}", id, status);
-        InvoiceEntity invoice = invoiceService.updateInvoiceStatus(id, status);
+        InvoiceId invoiceId = InvoiceId.of(id);
+        InvoiceEntity invoice = invoiceService.updateInvoiceStatus(invoiceId, status);
         return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 }

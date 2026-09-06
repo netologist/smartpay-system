@@ -190,7 +190,7 @@ class LedgerGrpcServiceTest {
     @Test
     @DisplayName("transferFunds: insufficient funds translates to Status.FAILED_PRECONDITION")
     void transferFunds_insufficientFunds() {
-        when(balanceService.transfer(any(), any(), any(), any(), any(), any(), any()))
+        when(balanceService.transfer(any(UUID.class), any(UUID.class), any(Money.class), any(), any(), any(), any()))
                 .thenThrow(new InsufficientFundsException(AccountId.of(accountId), Money.ofGBP("500.00"), Money.ofGBP("100.00")));
 
         TransferFundsRequest request = TransferFundsRequest.newBuilder()
@@ -213,7 +213,7 @@ class LedgerGrpcServiceTest {
     @Test
     @DisplayName("transferFunds: currency mismatch translates to Status.INVALID_ARGUMENT")
     void transferFunds_currencyMismatch() {
-        when(balanceService.transfer(any(), any(), any(), any(), any(), any(), any()))
+        when(balanceService.transfer(any(UUID.class), any(UUID.class), any(Money.class), any(), any(), any(), any()))
                 .thenThrow(new CurrencyMismatchException(Currency.getInstance("GBP"), Currency.getInstance("EUR")));
 
         TransferFundsRequest request = TransferFundsRequest.newBuilder()

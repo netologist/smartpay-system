@@ -15,7 +15,7 @@ public interface InvoiceMapper {
     @Mapping(source = "id", target = "epodId")
     EpodRecordResponse toEpodResponse(EpodRecordEntity entity);
 
-    @Mapping(source = "id", target = "invoiceId")
+    @Mapping(source = "invoiceId", target = "invoiceId")
     @Mapping(source = "pricing", target = "pricing")
     InvoiceResponse toInvoiceResponse(InvoiceEntity entity);
 

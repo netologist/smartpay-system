@@ -1,5 +1,7 @@
 package com.hozgan.smartpay.invoice.dto.request;
 
+import com.hozgan.smartpay.common.model.id.CarrierId;
+import com.hozgan.smartpay.common.model.id.LoadId;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -8,14 +10,13 @@ import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 
 public record VerifyEpodRequest(
-        @NotBlank(message = "loadId cannot be blank")
-        String loadId,
+        @NotNull(message = "loadId cannot be null")
+        LoadId loadId,
 
         @NotNull(message = "carrierId cannot be null")
-        UUID carrierId,
+        CarrierId carrierId,
 
         @NotNull(message = "deliveredAt cannot be null")
         Instant deliveredAt,

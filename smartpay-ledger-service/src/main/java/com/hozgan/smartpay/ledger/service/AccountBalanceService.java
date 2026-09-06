@@ -68,6 +68,26 @@ public class AccountBalanceService {
      */
     @Transactional
     public TransferResult transfer(
+            AccountId sourceAccountId,
+            AccountId targetAccountId,
+            Money amount,
+            String referenceType,
+            String referenceId,
+            IdempotencyKey idempotencyKey,
+            String description) {
+        return transfer(
+                sourceAccountId.value(),
+                targetAccountId.value(),
+                amount,
+                referenceType,
+                referenceId,
+                idempotencyKey.value(),
+                description
+        );
+    }
+
+    @Transactional
+    public TransferResult transfer(
             UUID sourceAccountId,
             UUID targetAccountId,
             Money amount,
@@ -284,6 +304,36 @@ public class AccountBalanceService {
     @Transactional(readOnly = true)
     public AccountBalanceEntity getBalance(UUID accountId) {
         return requireBalance(accountId);
+    }
+
+    @Transactional(readOnly = true)
+    public AccountBalanceEntity getBalance(AccountId accountId) {
+        return getBalance(accountId.value());
+    }
+
+    @Transactional
+    public AccountBalanceEntity holdFunds(AccountId accountId, Money amount) {
+        return holdFunds(accountId.value(), amount);
+    }
+
+    @Transactional
+    public AccountBalanceEntity releaseHold(
+            AccountId sourceAccountId,
+            AccountId targetAccountId,
+            Money amount,
+            boolean capture,
+            String referenceType,
+            String referenceId,
+            IdempotencyKey idempotencyKey) {
+        return releaseHold(
+                sourceAccountId.value(),
+                targetAccountId != null ? targetAccountId.value() : null,
+                amount,
+                capture,
+                referenceType,
+                referenceId,
+                idempotencyKey != null ? idempotencyKey.value() : null
+        );
     }
 
     // =========================================================================

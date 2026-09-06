@@ -54,4 +54,11 @@ public class AccountEntity {
         this.currency = currency != null ? currency : "GBP";
         this.createdAt = Instant.now();
     }
+    public com.hozgan.smartpay.common.model.id.AccountId getAccountId() {
+        return com.hozgan.smartpay.common.model.id.AccountId.of(id);
+    }
+
+    public com.hozgan.smartpay.common.model.id.AccountNumber getAccountNumberTyped() {
+        return com.hozgan.smartpay.common.model.id.AccountNumber.of(accountNumber);
+    }
 }

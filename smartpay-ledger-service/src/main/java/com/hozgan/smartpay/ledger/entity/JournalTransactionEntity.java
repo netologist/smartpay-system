@@ -1,8 +1,12 @@
 package com.hozgan.smartpay.ledger.entity;
 
+import com.hozgan.smartpay.common.converter.IdempotencyKeyConverter;
 import com.hozgan.smartpay.common.model.enums.JournalStatus;
+import com.hozgan.smartpay.common.model.id.IdempotencyKey;
+import com.hozgan.smartpay.common.model.id.TransactionId;
 import com.hozgan.smartpay.common.util.UuidV7;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -31,8 +35,9 @@ public class JournalTransactionEntity {
     @Column(name = "reference_id", nullable = false, length = 64)
     private String referenceId;
 
+    @Convert(converter = IdempotencyKeyConverter.class)
     @Column(name = "idempotency_key", unique = true, nullable = false, length = 128)
-    private String idempotencyKey;
+    private IdempotencyKey idempotencyKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
@@ -48,7 +53,7 @@ public class JournalTransactionEntity {
         this.id = UuidV7.generate();
     }
 
-    public JournalTransactionEntity(String referenceType, String referenceId, String idempotencyKey, JournalStatus status, String description) {
+    public JournalTransactionEntity(String referenceType, String referenceId, IdempotencyKey idempotencyKey, JournalStatus status, String description) {
         this.id = UuidV7.generate();
         this.referenceType = referenceType;
         this.referenceId = referenceId;
@@ -56,5 +61,13 @@ public class JournalTransactionEntity {
         this.status = status;
         this.description = description;
         this.postedAt = Instant.now();
+    }
+
+    public JournalTransactionEntity(String referenceType, String referenceId, String idempotencyKey, JournalStatus status, String description) {
+        this(referenceType, referenceId, IdempotencyKey.of(idempotencyKey), status, description);
+    }
+
+    public TransactionId getTransactionId() {
+        return TransactionId.of(id);
     }
 }

@@ -1,6 +1,7 @@
 package com.hozgan.smartpay.invoice.web;
 
 import com.hozgan.smartpay.common.exception.EntityNotFoundException;
+import com.hozgan.smartpay.common.model.id.LoadId;
 import com.hozgan.smartpay.invoice.dto.request.VerifyEpodRequest;
 import com.hozgan.smartpay.invoice.dto.response.EpodRecordResponse;
 import com.hozgan.smartpay.invoice.entity.EpodRecordEntity;
@@ -53,8 +54,9 @@ public class EpodController {
 
     @GetMapping("/{loadId}")
     public ResponseEntity<EpodRecordResponse> getEpodByLoadId(@PathVariable String loadId) {
-        EpodRecordEntity epod = epodService.findByLoadId(loadId)
-                .orElseThrow(() -> new EntityNotFoundException("EpodRecord", loadId));
+        LoadId typedLoadId = LoadId.of(loadId);
+        EpodRecordEntity epod = epodService.findByLoadId(typedLoadId)
+                .orElseThrow(() -> new EntityNotFoundException("EpodRecord", typedLoadId));
 
         return ResponseEntity.ok(invoiceMapper.toEpodResponse(epod));
     }

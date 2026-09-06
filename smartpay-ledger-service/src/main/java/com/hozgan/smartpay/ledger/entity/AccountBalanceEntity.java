@@ -48,6 +48,14 @@ public class AccountBalanceEntity {
         this.updatedAt = Instant.now();
     }
 
+    public AccountBalanceEntity(com.hozgan.smartpay.common.model.id.AccountId accountId, long clearedBalancePence, long holdBalancePence) {
+        this(accountId.value(), clearedBalancePence, holdBalancePence);
+    }
+
+    public com.hozgan.smartpay.common.model.id.AccountId getAccountIdTyped() {
+        return com.hozgan.smartpay.common.model.id.AccountId.of(accountId);
+    }
+
     public Money getClearedBalance(Currency currency) {
         return Money.ofMinor(clearedBalancePence, currency);
     }

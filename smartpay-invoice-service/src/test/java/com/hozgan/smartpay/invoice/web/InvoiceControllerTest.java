@@ -7,14 +7,17 @@ import com.hozgan.smartpay.common.model.InvoicePricing;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.InvoiceStatus;
 import com.hozgan.smartpay.common.model.enums.VehicleType;
+import com.hozgan.smartpay.common.model.id.CarrierId;
 import com.hozgan.smartpay.common.model.id.InvoiceId;
 import com.hozgan.smartpay.common.model.id.LoadId;
+import com.hozgan.smartpay.common.model.id.ShipperId;
 import com.hozgan.smartpay.invoice.TestcontainersConfiguration;
 import com.hozgan.smartpay.invoice.dto.request.CreateInvoiceRequest;
 import com.hozgan.smartpay.invoice.entity.InvoiceEntity;
 import com.hozgan.smartpay.invoice.service.InvoiceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,8 +42,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.junit.jupiter.api.Tag;
-
 @Tag("integration")
 @SpringBootTest(webEnvironment = WebEnvironment.MOCK)
 @Import(TestcontainersConfiguration.class)
@@ -53,8 +54,10 @@ class InvoiceControllerTest {
     @MockitoBean
     private InvoiceService invoiceService;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private InvoicePricing createSamplePricing() {
         Money base = Money.ofGBP("525.00");
@@ -71,9 +74,9 @@ class InvoiceControllerTest {
     @Test
     @DisplayName("AC-2: POST /api/v1/invoices creates invoice and returns HTTP 201 with Money pricing")
     void ac2_createInvoiceReturnsCreated() throws Exception {
-        UUID shipperId = UUID.randomUUID();
-        UUID carrierId = UUID.randomUUID();
-        String loadId = "LOAD-2026-UK-0841";
+        ShipperId shipperId = ShipperId.generate();
+        CarrierId carrierId = CarrierId.generate();
+        LoadId loadId = LoadId.of("LOAD-2026-UK-0841");
 
         CreateInvoiceRequest request = new CreateInvoiceRequest(
                 loadId,
@@ -103,7 +106,7 @@ class InvoiceControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.loadId").value(loadId))
+                .andExpect(jsonPath("$.loadId").value("LOAD-2026-UK-0841"))
                 .andExpect(jsonPath("$.vehicleType").value("ARTIC"))
                 .andExpect(jsonPath("$.status").value("EPOD_VERIFIED"))
                 .andExpect(jsonPath("$.currency").value("GBP"))
@@ -125,16 +128,16 @@ class InvoiceControllerTest {
     @DisplayName("AC-4: Duplicate invoice creation throws DuplicateLoadException -> HTTP 409 Conflict")
     void ac4_duplicateInvoiceReturnsConflict() throws Exception {
         CreateInvoiceRequest request = new CreateInvoiceRequest(
-                "LOAD-DUP",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+                LoadId.of("LOAD-DUP"),
+                ShipperId.generate(),
+                CarrierId.generate(),
                 VehicleType.VAN,
                 new BigDecimal("50.00"),
                 "GBP"
         );
 
         when(invoiceService.createInvoice(any(), any(), any(), any(), any(), any()))
-                .thenThrow(new DuplicateLoadException(new LoadId("LOAD-DUP")));
+                .thenThrow(new DuplicateLoadException(LoadId.of("LOAD-DUP")));
 
         mockMvc.perform(post("/api/v1/invoices")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -146,25 +149,26 @@ class InvoiceControllerTest {
     @Test
     @DisplayName("GET /api/v1/invoices/{id} returns invoice when found, 404 when absent")
     void getInvoiceById() throws Exception {
-        UUID invoiceId = UUID.randomUUID();
+        UUID rawId = UUID.randomUUID();
+        InvoiceId invoiceId = InvoiceId.of(rawId);
         InvoiceEntity entity = new InvoiceEntity(
-                "LOAD-TEST",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+                LoadId.of("LOAD-TEST"),
+                ShipperId.generate(),
+                CarrierId.generate(),
                 VehicleType.LUTON,
                 new BigDecimal("80.00"),
                 createSamplePricing(),
                 InvoiceStatus.EPOD_VERIFIED
         );
-        entity.setId(invoiceId);
+        entity.setId(rawId);
 
         when(invoiceService.getInvoiceById(invoiceId)).thenReturn(entity);
-        when(invoiceService.getInvoiceById(eq(UUID.fromString("00000000-0000-0000-0000-000000000000"))))
+        when(invoiceService.getInvoiceById(eq(InvoiceId.of(UUID.fromString("00000000-0000-0000-0000-000000000000")))))
                 .thenThrow(new EntityNotFoundException("Invoice", "00000000-0000-0000-0000-000000000000"));
 
-        mockMvc.perform(get("/api/v1/invoices/" + invoiceId))
+        mockMvc.perform(get("/api/v1/invoices/" + rawId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.invoiceId").value(invoiceId.toString()))
+                .andExpect(jsonPath("$.invoiceId").value(rawId.toString()))
                 .andExpect(jsonPath("$.loadId").value("LOAD-TEST"));
 
         mockMvc.perform(get("/api/v1/invoices/00000000-0000-0000-0000-000000000000"))
@@ -175,12 +179,13 @@ class InvoiceControllerTest {
     @Test
     @DisplayName("AC-5: PUT /api/v1/invoices/{id}/cancel on SETTLED invoice -> HTTP 422 Unprocessable Entity")
     void ac5_cancelSettledInvoiceReturnsUnprocessableEntity() throws Exception {
-        UUID invoiceId = UUID.randomUUID();
+        UUID rawId = UUID.randomUUID();
+        InvoiceId invoiceId = InvoiceId.of(rawId);
 
         when(invoiceService.cancelInvoice(invoiceId))
-                .thenThrow(new InvoiceAlreadySettledException(new InvoiceId(invoiceId)));
+                .thenThrow(new InvoiceAlreadySettledException(invoiceId));
 
-        mockMvc.perform(put("/api/v1/invoices/" + invoiceId + "/cancel"))
+        mockMvc.perform(put("/api/v1/invoices/" + rawId + "/cancel"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errorCode").value("ERR_INVOICE_ALREADY_SETTLED"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("has already been settled")));

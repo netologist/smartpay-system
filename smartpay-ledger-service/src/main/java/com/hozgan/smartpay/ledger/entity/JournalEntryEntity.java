@@ -1,9 +1,14 @@
 package com.hozgan.smartpay.ledger.entity;
 
+import com.hozgan.smartpay.common.converter.AccountIdConverter;
+import com.hozgan.smartpay.common.converter.TransactionIdConverter;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.EntryType;
+import com.hozgan.smartpay.common.model.id.AccountId;
+import com.hozgan.smartpay.common.model.id.TransactionId;
 import com.hozgan.smartpay.common.util.UuidV7;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -27,11 +32,13 @@ public class JournalEntryEntity {
     @Id
     private UUID id;
 
+    @Convert(converter = TransactionIdConverter.class)
     @Column(name = "transaction_id", nullable = false)
-    private UUID transactionId;
+    private TransactionId transactionId;
 
+    @Convert(converter = AccountIdConverter.class)
     @Column(name = "account_id", nullable = false)
-    private UUID accountId;
+    private AccountId accountId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "entry_type", nullable = false, length = 6)
@@ -50,7 +57,7 @@ public class JournalEntryEntity {
         this.id = UuidV7.generate();
     }
 
-    public JournalEntryEntity(UUID transactionId, UUID accountId, EntryType entryType, long amountInPence, String currency) {
+    public JournalEntryEntity(TransactionId transactionId, AccountId accountId, EntryType entryType, long amountInPence, String currency) {
         this.id = UuidV7.generate();
         this.transactionId = transactionId;
         this.accountId = accountId;
@@ -58,6 +65,10 @@ public class JournalEntryEntity {
         this.amountInPence = amountInPence;
         this.currency = currency != null ? currency : "GBP";
         this.createdAt = Instant.now();
+    }
+
+    public JournalEntryEntity(UUID transactionId, UUID accountId, EntryType entryType, long amountInPence, String currency) {
+        this(TransactionId.of(transactionId), AccountId.of(accountId), entryType, amountInPence, currency);
     }
 
     public Money getAmount() {

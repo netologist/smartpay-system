@@ -1,5 +1,8 @@
 package com.hozgan.smartpay.ledger.service;
 
+import com.hozgan.smartpay.common.model.id.TransactionId;
+import com.hozgan.smartpay.common.model.id.AccountId;
+import com.hozgan.smartpay.common.model.id.IdempotencyKey;
 import com.hozgan.smartpay.common.exception.UnbalancedJournalTransactionException;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.JournalStatus;
@@ -84,7 +87,7 @@ class LedgerDomainServiceTest {
             JournalTransactionEntity saved = txCaptor.getValue();
 
             assertThat(saved.getStatus()).isEqualTo(JournalStatus.POSTED);
-            assertThat(saved.getIdempotencyKey()).isEqualTo("IDEMP-001");
+            assertThat(saved.getIdempotencyKey()).isEqualTo(IdempotencyKey.of("IDEMP-001"));
             assertThat(saved.getReferenceType()).isEqualTo("INVOICE_SETTLEMENT");
             assertThat(saved.getReferenceId()).isEqualTo("INV-001");
         }
@@ -108,11 +111,11 @@ class LedgerDomainServiceTest {
             JournalEntryEntity credit = entries.stream()
                     .filter(e -> e.getEntryType().name().equals("CREDIT")).findFirst().orElseThrow();
 
-            assertThat(debit.getAccountId()).isEqualTo(sourceId);
+            assertThat(debit.getAccountId()).isEqualTo(AccountId.of(sourceId));
             assertThat(debit.getAmountInPence()).isEqualTo(25000L);
             assertThat(debit.getCurrency()).isEqualTo("GBP");
 
-            assertThat(credit.getAccountId()).isEqualTo(targetId);
+            assertThat(credit.getAccountId()).isEqualTo(AccountId.of(targetId));
             assertThat(credit.getAmountInPence()).isEqualTo(25000L);
             assertThat(credit.getCurrency()).isEqualTo("GBP");
         }
@@ -129,7 +132,7 @@ class LedgerDomainServiceTest {
             verify(journalEntryRepository).saveAll(entriesCaptor.capture());
             List<JournalEntryEntity> entries = entriesCaptor.getValue();
 
-            UUID txId = entries.get(0).getTransactionId();
+            TransactionId txId = entries.get(0).getTransactionId();
             assertThat(entries).allMatch(e -> e.getTransactionId().equals(txId));
         }
 

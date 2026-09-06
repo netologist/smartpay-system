@@ -51,12 +51,12 @@ public class LedgerTransferController {
         Money amount = Money.ofMinor(request.amountInPence(), currency);
 
         TransferResult result = accountBalanceService.transfer(
-                UUID.fromString(request.sourceAccountId()),
-                UUID.fromString(request.targetAccountId()),
+                request.sourceAccountIdTyped(),
+                request.targetAccountIdTyped(),
                 amount,
                 request.referenceType(),
                 request.referenceId(),
-                idempotencyKey,
+                com.hozgan.smartpay.common.model.id.IdempotencyKey.of(idempotencyKey),
                 request.description());
 
         log.info("Transfer processed: transactionId={}, status={}", result.transactionId(), result.status());
@@ -75,7 +75,7 @@ public class LedgerTransferController {
     @GetMapping("/accounts/{accountId}/balance")
     public ResponseEntity<BalanceResponse> getBalance(@PathVariable UUID accountId) {
         log.debug("Fetching balance for account {}", accountId);
-        var balance = accountBalanceService.getBalance(accountId);
+        var balance = accountBalanceService.getBalance(com.hozgan.smartpay.common.model.id.AccountId.of(accountId));
         return ResponseEntity.ok(new BalanceResponse(
                 accountId.toString(),
                 balance.getClearedBalancePence(),

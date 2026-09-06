@@ -2,6 +2,9 @@ package com.hozgan.smartpay.invoice;
 
 import com.hozgan.smartpay.common.model.enums.InvoiceStatus;
 import com.hozgan.smartpay.common.model.enums.VehicleType;
+import com.hozgan.smartpay.common.model.id.CarrierId;
+import com.hozgan.smartpay.common.model.id.LoadId;
+import com.hozgan.smartpay.common.model.id.ShipperId;
 import com.hozgan.smartpay.invoice.dto.request.CreateInvoiceRequest;
 import com.hozgan.smartpay.invoice.dto.request.VerifyEpodRequest;
 import com.hozgan.smartpay.invoice.entity.EpodRecordEntity;
@@ -10,6 +13,7 @@ import com.hozgan.smartpay.invoice.repository.EpodRecordRepository;
 import com.hozgan.smartpay.invoice.repository.InvoiceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,8 +37,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.junit.jupiter.api.Tag;
-
 @Tag("integration")
 @SpringBootTest(webEnvironment = WebEnvironment.MOCK)
 @Import(TestcontainersConfiguration.class)
@@ -50,8 +52,10 @@ class InvoiceEpodIntegrationTest {
     @Autowired
     private InvoiceRepository invoiceRepository;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String VALID_SIGNATURE = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
@@ -63,8 +67,8 @@ class InvoiceEpodIntegrationTest {
     @Test
     @DisplayName("AC-1: Electronic Delivery Proof (ePOD) Verification persisted in PostgreSQL")
     void ac1_epodVerificationEndToEnd() throws Exception {
-        String loadId = "LOAD-IT-AC1-" + UUID.randomUUID().toString().substring(0, 8);
-        UUID carrierId = UUID.randomUUID();
+        LoadId loadId = LoadId.of("LOAD-IT-AC1-" + UUID.randomUUID().toString().substring(0, 8));
+        CarrierId carrierId = CarrierId.generate();
         Instant deliveredAt = Instant.parse("2026-09-05T14:45:10Z");
 
         VerifyEpodRequest request = new VerifyEpodRequest(
@@ -81,7 +85,7 @@ class InvoiceEpodIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.loadId").value(loadId))
+                .andExpect(jsonPath("$.loadId").value(loadId.asString()))
                 .andExpect(jsonPath("$.verified").value(true));
 
         // Verify persistence in PostgreSQL
@@ -97,9 +101,9 @@ class InvoiceEpodIntegrationTest {
     @Test
     @DisplayName("AC-2: Freight Invoice Itemized Pricing Calculation and Database Persistence")
     void ac2_freightInvoicePricingAndPersistence() throws Exception {
-        String loadId = "LOAD-IT-AC2-" + UUID.randomUUID().toString().substring(0, 8);
-        UUID shipperId = UUID.randomUUID();
-        UUID carrierId = UUID.randomUUID();
+        LoadId loadId = LoadId.of("LOAD-IT-AC2-" + UUID.randomUUID().toString().substring(0, 8));
+        ShipperId shipperId = ShipperId.generate();
+        CarrierId carrierId = CarrierId.generate();
 
         CreateInvoiceRequest request = new CreateInvoiceRequest(
                 loadId,
@@ -114,7 +118,7 @@ class InvoiceEpodIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.loadId").value(loadId))
+                .andExpect(jsonPath("$.loadId").value(loadId.asString()))
                 .andExpect(jsonPath("$.vehicleType").value("ARTIC"))
                 .andExpect(jsonPath("$.status").value("EPOD_VERIFIED"))
                 .andExpect(jsonPath("$.pricing.baseAmount.amount").value("525.00"))
@@ -142,9 +146,9 @@ class InvoiceEpodIntegrationTest {
     @Test
     @DisplayName("AC-3: Multi-Currency Invoice Support (EUR)")
     void ac3_multiCurrencyInvoiceEUR() throws Exception {
-        String loadId = "LOAD-IT-AC3-" + UUID.randomUUID().toString().substring(0, 8);
-        UUID shipperId = UUID.randomUUID();
-        UUID carrierId = UUID.randomUUID();
+        LoadId loadId = LoadId.of("LOAD-IT-AC3-" + UUID.randomUUID().toString().substring(0, 8));
+        ShipperId shipperId = ShipperId.generate();
+        CarrierId carrierId = CarrierId.generate();
 
         CreateInvoiceRequest request = new CreateInvoiceRequest(
                 loadId,
@@ -178,9 +182,9 @@ class InvoiceEpodIntegrationTest {
     @Test
     @DisplayName("AC-4: Duplicate ePOD and Invoice Creation Rejected with HTTP 409 Conflict")
     void ac4_duplicateDeliveryPrevention() throws Exception {
-        String loadId = "LOAD-IT-AC4-" + UUID.randomUUID().toString().substring(0, 8);
-        UUID carrierId = UUID.randomUUID();
-        UUID shipperId = UUID.randomUUID();
+        LoadId loadId = LoadId.of("LOAD-IT-AC4-" + UUID.randomUUID().toString().substring(0, 8));
+        CarrierId carrierId = CarrierId.generate();
+        ShipperId shipperId = ShipperId.generate();
 
         // 1. Submit initial ePOD
         VerifyEpodRequest epodRequest = new VerifyEpodRequest(
@@ -231,9 +235,9 @@ class InvoiceEpodIntegrationTest {
     @Test
     @DisplayName("AC-5: Settlement Mutability Lock prevents modification of SETTLED invoice")
     void ac5_settlementMutabilityLock() throws Exception {
-        String loadId = "LOAD-IT-AC5-" + UUID.randomUUID().toString().substring(0, 8);
-        UUID shipperId = UUID.randomUUID();
-        UUID carrierId = UUID.randomUUID();
+        LoadId loadId = LoadId.of("LOAD-IT-AC5-" + UUID.randomUUID().toString().substring(0, 8));
+        ShipperId shipperId = ShipperId.generate();
+        CarrierId carrierId = CarrierId.generate();
 
         CreateInvoiceRequest invoiceRequest = new CreateInvoiceRequest(
                 loadId,
@@ -275,11 +279,11 @@ class InvoiceEpodIntegrationTest {
         VehicleType[] types = {VehicleType.VAN, VehicleType.LUTON, VehicleType.SEVEN_POINT_FIVE_TONNE, VehicleType.ARTIC};
 
         for (VehicleType vt : types) {
-            String loadId = "LOAD-VT-" + vt.name() + "-" + UUID.randomUUID().toString().substring(0, 8);
+            LoadId loadId = LoadId.of("LOAD-VT-" + vt.name() + "-" + UUID.randomUUID().toString().substring(0, 8));
             CreateInvoiceRequest req = new CreateInvoiceRequest(
                     loadId,
-                    UUID.randomUUID(),
-                    UUID.randomUUID(),
+                    ShipperId.generate(),
+                    CarrierId.generate(),
                     vt,
                     new BigDecimal("100.00"),
                     "GBP"

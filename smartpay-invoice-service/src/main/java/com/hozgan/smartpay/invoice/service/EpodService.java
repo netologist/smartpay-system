@@ -19,7 +19,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class EpodService {
@@ -36,8 +35,8 @@ public class EpodService {
     }
 
     @Transactional
-    public EpodRecordEntity verifyAndRecordEpod(String loadId,
-                                               UUID carrierId,
+    public EpodRecordEntity verifyAndRecordEpod(LoadId loadId,
+                                               CarrierId carrierId,
                                                Instant deliveredAt,
                                                BigDecimal latitude,
                                                BigDecimal longitude,
@@ -53,7 +52,7 @@ public class EpodService {
             SignatureHash.of(signatureHash);
         } catch (Exception e) {
             log.warn("Invalid ePOD signature hash for load {}: {}", loadId, signatureHash);
-            throw new InvalidEpodSignatureException(new LoadId(loadId));
+            throw new InvalidEpodSignatureException(loadId);
         }
 
         // 2. Geospatial boundary validation (-90 to 90 lat, -180 to 180 lon)
@@ -62,7 +61,7 @@ public class EpodService {
         // 3. Prevent duplicate delivery proofs for the same load (AC-4)
         if (epodRecordRepository.findByLoadId(loadId).isPresent()) {
             log.warn("ePOD record already exists for load: {}", loadId);
-            throw new DuplicateLoadException(new LoadId(loadId));
+            throw new DuplicateLoadException(loadId);
         }
 
         // 4. Persist verified ePOD record
@@ -80,8 +79,8 @@ public class EpodService {
 
         // 5. Emit EpodVerifiedEvent
         EpodVerifiedEvent event = EpodVerifiedEvent.of(
-                new LoadId(loadId),
-                new CarrierId(carrierId),
+                loadId,
+                carrierId,
                 deliveredAt,
                 location
         );
@@ -91,7 +90,7 @@ public class EpodService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<EpodRecordEntity> findByLoadId(String loadId) {
+    public Optional<EpodRecordEntity> findByLoadId(LoadId loadId) {
         return epodRecordRepository.findByLoadId(loadId);
     }
 }

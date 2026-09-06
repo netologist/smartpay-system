@@ -1,7 +1,12 @@
 package com.hozgan.smartpay.invoice.entity;
 
 import com.hozgan.smartpay.common.model.GeoLocation;
+import com.hozgan.smartpay.common.model.id.CarrierId;
+import com.hozgan.smartpay.common.model.id.LoadId;
 import com.hozgan.smartpay.common.util.UuidV7;
+import com.hozgan.smartpay.common.converter.CarrierIdConverter;
+import com.hozgan.smartpay.common.converter.LoadIdConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -18,11 +23,13 @@ public class EpodRecordEntity {
     @Id
     private UUID id;
 
+    @Convert(converter = LoadIdConverter.class)
     @Column(name = "load_id", unique = true, nullable = false, length = 64)
-    private String loadId;
+    private LoadId loadId;
 
+    @Convert(converter = CarrierIdConverter.class)
     @Column(name = "carrier_id", nullable = false)
-    private UUID carrierId;
+    private CarrierId carrierId;
 
     @Column(name = "delivered_at", nullable = false)
     private Instant deliveredAt;
@@ -49,8 +56,8 @@ public class EpodRecordEntity {
         this.id = UuidV7.generate();
     }
 
-    public EpodRecordEntity(String loadId,
-                            UUID carrierId,
+    public EpodRecordEntity(LoadId loadId,
+                            CarrierId carrierId,
                             Instant deliveredAt,
                             GeoLocation location,
                             String photoS3Url,
@@ -80,19 +87,19 @@ public class EpodRecordEntity {
         this.id = id;
     }
 
-    public String getLoadId() {
+    public LoadId getLoadId() {
         return loadId;
     }
 
-    public void setLoadId(String loadId) {
+    public void setLoadId(LoadId loadId) {
         this.loadId = loadId;
     }
 
-    public UUID getCarrierId() {
+    public CarrierId getCarrierId() {
         return carrierId;
     }
 
-    public void setCarrierId(UUID carrierId) {
+    public void setCarrierId(CarrierId carrierId) {
         this.carrierId = carrierId;
     }
 

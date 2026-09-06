@@ -1,22 +1,23 @@
 package com.hozgan.smartpay.invoice.dto.request;
 
 import com.hozgan.smartpay.common.model.enums.VehicleType;
+import com.hozgan.smartpay.common.model.id.CarrierId;
+import com.hozgan.smartpay.common.model.id.LoadId;
+import com.hozgan.smartpay.common.model.id.ShipperId;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 public record CreateInvoiceRequest(
-        @NotBlank(message = "loadId cannot be blank")
-        String loadId,
+        @NotNull(message = "loadId cannot be null")
+        LoadId loadId,
 
         @NotNull(message = "shipperId cannot be null")
-        UUID shipperId,
+        ShipperId shipperId,
 
         @NotNull(message = "carrierId cannot be null")
-        UUID carrierId,
+        CarrierId carrierId,
 
         @NotNull(message = "vehicleType cannot be null")
         VehicleType vehicleType,

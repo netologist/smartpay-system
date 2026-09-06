@@ -5,7 +5,13 @@ import com.hozgan.smartpay.common.model.InvoicePricing;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.InvoiceStatus;
 import com.hozgan.smartpay.common.model.enums.VehicleType;
+import com.hozgan.smartpay.common.model.id.CarrierId;
 import com.hozgan.smartpay.common.model.id.InvoiceId;
+import com.hozgan.smartpay.common.model.id.LoadId;
+import com.hozgan.smartpay.common.converter.CarrierIdConverter;
+import com.hozgan.smartpay.common.converter.LoadIdConverter;
+import com.hozgan.smartpay.common.converter.ShipperIdConverter;
+import com.hozgan.smartpay.common.model.id.ShipperId;
 import com.hozgan.smartpay.common.util.UuidV7;
 import com.hozgan.smartpay.invoice.converter.VehicleTypeConverter;
 import jakarta.persistence.Column;
@@ -28,14 +34,17 @@ public class InvoiceEntity {
     @Id
     private UUID id;
 
+    @Convert(converter = LoadIdConverter.class)
     @Column(name = "load_id", unique = true, nullable = false, length = 64)
-    private String loadId;
+    private LoadId loadId;
 
+    @Convert(converter = ShipperIdConverter.class)
     @Column(name = "shipper_id", nullable = false)
-    private UUID shipperId;
+    private ShipperId shipperId;
 
+    @Convert(converter = CarrierIdConverter.class)
     @Column(name = "carrier_id", nullable = false)
-    private UUID carrierId;
+    private CarrierId carrierId;
 
     @Convert(converter = VehicleTypeConverter.class)
     @Column(name = "vehicle_type", nullable = false, length = 16)
@@ -73,9 +82,9 @@ public class InvoiceEntity {
         this.id = UuidV7.generate();
     }
 
-    public InvoiceEntity(String loadId,
-                         UUID shipperId,
-                         UUID carrierId,
+    public InvoiceEntity(LoadId loadId,
+                         ShipperId shipperId,
+                         CarrierId carrierId,
                          VehicleType vehicleType,
                          BigDecimal mileageMiles,
                          InvoicePricing pricing,
@@ -114,7 +123,7 @@ public class InvoiceEntity {
 
     private void assertNotSettled() {
         if (this.status == InvoiceStatus.SETTLED) {
-            throw new InvoiceAlreadySettledException(new InvoiceId(this.id));
+            throw new InvoiceAlreadySettledException(getInvoiceId());
         }
     }
 
@@ -126,27 +135,35 @@ public class InvoiceEntity {
         this.id = id;
     }
 
-    public String getLoadId() {
+    public InvoiceId getInvoiceId() {
+        return InvoiceId.of(id);
+    }
+
+    public void setInvoiceId(InvoiceId invoiceId) {
+        this.id = invoiceId != null ? invoiceId.value() : null;
+    }
+
+    public LoadId getLoadId() {
         return loadId;
     }
 
-    public void setLoadId(String loadId) {
+    public void setLoadId(LoadId loadId) {
         this.loadId = loadId;
     }
 
-    public UUID getShipperId() {
+    public ShipperId getShipperId() {
         return shipperId;
     }
 
-    public void setShipperId(UUID shipperId) {
+    public void setShipperId(ShipperId shipperId) {
         this.shipperId = shipperId;
     }
 
-    public UUID getCarrierId() {
+    public CarrierId getCarrierId() {
         return carrierId;
     }
 
-    public void setCarrierId(UUID carrierId) {
+    public void setCarrierId(CarrierId carrierId) {
         this.carrierId = carrierId;
     }
 

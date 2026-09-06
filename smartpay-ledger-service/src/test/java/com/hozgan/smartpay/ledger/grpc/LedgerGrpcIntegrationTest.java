@@ -180,7 +180,7 @@ class LedgerGrpcIntegrationTest {
         UUID txId = UUID.fromString(response.getTransactionId());
         Optional<JournalTransactionEntity> journalTx = journalTransactionRepository.findById(txId);
         assertThat(journalTx).isPresent();
-        assertThat(journalTx.get().getIdempotencyKey()).isEqualTo(idempotencyKey);
+        assertThat(journalTx.get().getIdempotencyKey().value()).isEqualTo(idempotencyKey);
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.hozgan.smartpay.invoice.web;
 import com.hozgan.smartpay.common.exception.DuplicateLoadException;
 import com.hozgan.smartpay.common.exception.InvalidEpodSignatureException;
 import com.hozgan.smartpay.common.model.GeoLocation;
+import com.hozgan.smartpay.common.model.id.CarrierId;
 import com.hozgan.smartpay.common.model.id.LoadId;
 import com.hozgan.smartpay.invoice.TestcontainersConfiguration;
 import com.hozgan.smartpay.invoice.dto.request.VerifyEpodRequest;
@@ -10,6 +11,7 @@ import com.hozgan.smartpay.invoice.entity.EpodRecordEntity;
 import com.hozgan.smartpay.invoice.service.EpodService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,8 +37,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.junit.jupiter.api.Tag;
-
 @Tag("integration")
 @SpringBootTest(webEnvironment = WebEnvironment.MOCK)
 @Import(TestcontainersConfiguration.class)
@@ -49,8 +49,10 @@ class EpodControllerTest {
     @MockitoBean
     private EpodService epodService;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String VALID_SIGNATURE = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
@@ -62,9 +64,9 @@ class EpodControllerTest {
     @Test
     @DisplayName("AC-1: Valid ePOD verification returns HTTP 201 Created with EpodRecordResponse")
     void ac1_validEpodReturnsCreated() throws Exception {
-        UUID carrierId = UUID.randomUUID();
+        CarrierId carrierId = CarrierId.generate();
         Instant deliveredAt = Instant.parse("2026-09-05T14:45:10Z");
-        String loadId = "LOAD-2026-UK-0841";
+        LoadId loadId = LoadId.of("LOAD-2026-UK-0841");
 
         VerifyEpodRequest request = new VerifyEpodRequest(
                 loadId,
@@ -96,16 +98,16 @@ class EpodControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.loadId").value(loadId))
-                .andExpect(jsonPath("$.carrierId").value(carrierId.toString()))
+                .andExpect(jsonPath("$.loadId").value("LOAD-2026-UK-0841"))
+                .andExpect(jsonPath("$.carrierId").value(carrierId.asString()))
                 .andExpect(jsonPath("$.verified").value(true));
     }
 
     @Test
     @DisplayName("AC-1: Invalid signature format throws InvalidEpodSignatureException -> HTTP 400 Bad Request")
     void ac1_invalidSignatureReturnsBadRequest() throws Exception {
-        UUID carrierId = UUID.randomUUID();
-        String loadId = "LOAD-2026-UK-0841";
+        CarrierId carrierId = CarrierId.generate();
+        LoadId loadId = LoadId.of("LOAD-2026-UK-0841");
 
         VerifyEpodRequest request = new VerifyEpodRequest(
                 loadId,
@@ -127,8 +129,8 @@ class EpodControllerTest {
     @Test
     @DisplayName("AC-1: Service throws InvalidEpodSignatureException -> HTTP 400 with ERR_INVALID_EPOD_SIGNATURE")
     void ac1_serviceThrowsInvalidSignatureReturnsBadRequest() throws Exception {
-        UUID carrierId = UUID.randomUUID();
-        String loadId = "LOAD-2026-UK-0841";
+        CarrierId carrierId = CarrierId.generate();
+        LoadId loadId = LoadId.of("LOAD-2026-UK-0841");
 
         VerifyEpodRequest request = new VerifyEpodRequest(
                 loadId,
@@ -141,7 +143,7 @@ class EpodControllerTest {
         );
 
         when(epodService.verifyAndRecordEpod(any(), any(), any(), any(), any(), any(), any()))
-                .thenThrow(new InvalidEpodSignatureException(new LoadId(loadId)));
+                .thenThrow(new InvalidEpodSignatureException(loadId));
 
         mockMvc.perform(post("/api/v1/epod/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -154,8 +156,8 @@ class EpodControllerTest {
     @Test
     @DisplayName("AC-4: Duplicate ePOD submission throws DuplicateLoadException -> HTTP 409 Conflict")
     void ac4_duplicateLoadReturnsConflict() throws Exception {
-        UUID carrierId = UUID.randomUUID();
-        String loadId = "LOAD-2026-UK-0841";
+        CarrierId carrierId = CarrierId.generate();
+        LoadId loadId = LoadId.of("LOAD-2026-UK-0841");
 
         VerifyEpodRequest request = new VerifyEpodRequest(
                 loadId,
@@ -168,7 +170,7 @@ class EpodControllerTest {
         );
 
         when(epodService.verifyAndRecordEpod(any(), any(), any(), any(), any(), any(), any()))
-                .thenThrow(new DuplicateLoadException(new LoadId(loadId)));
+                .thenThrow(new DuplicateLoadException(loadId));
 
         mockMvc.perform(post("/api/v1/epod/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -180,10 +182,10 @@ class EpodControllerTest {
     @Test
     @DisplayName("GET /api/v1/epod/{loadId} returns ePOD when found, 404 when absent")
     void getEpodByLoadId() throws Exception {
-        String loadId = "LOAD-FOUND";
+        LoadId loadId = LoadId.of("LOAD-FOUND");
         EpodRecordEntity entity = new EpodRecordEntity(
                 loadId,
-                UUID.randomUUID(),
+                CarrierId.generate(),
                 Instant.now(),
                 GeoLocation.of(51.5, -0.1),
                 "https://s3/test.jpg",
@@ -191,8 +193,8 @@ class EpodControllerTest {
                 true
         );
 
-        when(epodService.findByLoadId("LOAD-FOUND")).thenReturn(Optional.of(entity));
-        when(epodService.findByLoadId("LOAD-MISSING")).thenReturn(Optional.empty());
+        when(epodService.findByLoadId(eq(LoadId.of("LOAD-FOUND")))).thenReturn(Optional.of(entity));
+        when(epodService.findByLoadId(eq(LoadId.of("LOAD-MISSING")))).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/epod/LOAD-FOUND"))
                 .andExpect(status().isOk())

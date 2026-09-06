@@ -23,6 +23,11 @@
   * Never use ad-hoc package names like `.controller`.
 * **Immutability & Records**:
   * All domain value objects, DTOs, events, and IDs must be implemented as immutable Java `record` types.
+* **Strongly-Typed Domain Identifiers (`EntityId`)**:
+  * All domain entities, services, repositories, events, and DTOs **MUST strictly use strongly-typed identifiers** from `com.hozgan.smartpay.common.model.id.*` (`AccountId`, `CarrierId`, `ShipperId`, `InvoiceId`, `LoadId`, `TransactionId`, `IdempotencyKey`, `AccountNumber`, `EndToEndId`).
+  * **Never use primitive obsession** (passing raw `UUID` or `String` across domain boundaries). This eliminates type-confusion bugs (e.g. accidentally passing a `CarrierId` into a `ShipperId` parameter).
+  * In JPA entities, use `@Convert(converter = <Id>Converter.class)` to map strongly-typed IDs to underlying database columns.
+  * In REST APIs, `EntityIdJsonComponent` automatically marshals strongly-typed IDs to and from scalar JSON strings.
 * **Layered Monetary Precision Standards**:
   * **Database & Entity Layer**: Monetary values must be stored in minor units (`BIGINT` in pence/cents) with an explicit ISO-4217 currency code (`VARCHAR(3)`). Never use floating-point types (`double`/`float`) in the database.
   * **Service & Application Layer**: Business logic, services, domain models, and use cases must strictly operate on rich `com.hozgan.smartpay.common.model.Money` value objects (and composite domain models like `InvoicePricing`).

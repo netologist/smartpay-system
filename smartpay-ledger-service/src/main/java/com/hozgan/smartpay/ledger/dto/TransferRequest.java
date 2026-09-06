@@ -30,4 +30,12 @@ public record TransferRequest(
         String referenceId,
 
         String description
-) {}
+) {
+    public com.hozgan.smartpay.common.model.id.AccountId sourceAccountIdTyped() {
+        return com.hozgan.smartpay.common.model.id.AccountId.of(sourceAccountId);
+    }
+
+    public com.hozgan.smartpay.common.model.id.AccountId targetAccountIdTyped() {
+        return com.hozgan.smartpay.common.model.id.AccountId.of(targetAccountId);
+    }
+}

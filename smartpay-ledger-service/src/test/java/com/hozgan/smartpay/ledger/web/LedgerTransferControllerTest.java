@@ -5,6 +5,7 @@ import com.hozgan.smartpay.common.exception.InsufficientFundsException;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.JournalStatus;
 import com.hozgan.smartpay.common.model.id.AccountId;
+import com.hozgan.smartpay.common.model.id.IdempotencyKey;
 import com.hozgan.smartpay.ledger.TestcontainersConfiguration;
 import com.hozgan.smartpay.ledger.dto.TransferRequest;
 import com.hozgan.smartpay.ledger.service.AccountBalanceService;
@@ -88,12 +89,12 @@ class LedgerTransferControllerTest {
                     Money.ofGBP("250.00"));
 
             when(accountBalanceService.transfer(
-                    eq(UUID.fromString(SOURCE_ID)),
-                    eq(UUID.fromString(TARGET_ID)),
+                    eq(AccountId.of(UUID.fromString(SOURCE_ID))),
+                    eq(AccountId.of(UUID.fromString(TARGET_ID))),
                     any(Money.class),
                     eq("INVOICE_SETTLEMENT"),
                     eq("INV-001"),
-                    eq(IDEMP_KEY),
+                    eq(IdempotencyKey.of(IDEMP_KEY)),
                     any()))
                     .thenReturn(mockResult);
 
@@ -125,7 +126,7 @@ class LedgerTransferControllerTest {
                     SOURCE_ID, TARGET_ID, 200_000L, "GBP",
                     "INVOICE_SETTLEMENT", "INV-ERR-001", "Should fail");
 
-            when(accountBalanceService.transfer(any(), any(), any(), any(), any(), any(), any()))
+            when(accountBalanceService.transfer(any(AccountId.class), any(AccountId.class), any(Money.class), any(), any(), any(IdempotencyKey.class), any()))
                     .thenThrow(new InsufficientFundsException(
                             AccountId.of(UUID.fromString(SOURCE_ID)),
                             Money.ofGBP("2000.00"),
@@ -147,7 +148,7 @@ class LedgerTransferControllerTest {
                     SOURCE_ID, TARGET_ID, 10_000L, "GBP",
                     "INVOICE_SETTLEMENT", "INV-ERR-002", "Should fail");
 
-            when(accountBalanceService.transfer(any(), any(), any(), any(), any(), any(), any()))
+            when(accountBalanceService.transfer(any(AccountId.class), any(AccountId.class), any(Money.class), any(), any(), any(IdempotencyKey.class), any()))
                     .thenThrow(new AccountNotFoundException(AccountId.of(UUID.fromString(SOURCE_ID))));
 
             mockMvc().perform(post("/api/v1/ledger/transfers")

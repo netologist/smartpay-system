@@ -5,16 +5,17 @@ import com.hozgan.smartpay.common.model.InvoicePricing;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.InvoiceStatus;
 import com.hozgan.smartpay.common.model.enums.VehicleType;
+import com.hozgan.smartpay.common.model.id.CarrierId;
+import com.hozgan.smartpay.common.model.id.LoadId;
+import com.hozgan.smartpay.common.model.id.ShipperId;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
-import org.junit.jupiter.api.Tag;
 
 @Tag("unit")
 class InvoiceEntityTest {
@@ -29,18 +30,16 @@ class InvoiceEntityTest {
     @Test
     @DisplayName("AC-5: Settlement Mutability Lock prevents cancellation of SETTLED invoice")
     void ac5_settledInvoiceCannotBeCancelled() {
-        // Given: An invoice with status SETTLED
         InvoiceEntity invoice = new InvoiceEntity(
-                "LOAD-UK-0841",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+                LoadId.of("LOAD-UK-0841"),
+                ShipperId.generate(),
+                CarrierId.generate(),
                 VehicleType.ARTIC,
                 new BigDecimal("150.00"),
                 createSamplePricing(),
                 InvoiceStatus.SETTLED
         );
 
-        // When / Then: Attempt to cancel throws InvoiceAlreadySettledException
         assertThatThrownBy(invoice::cancel)
                 .isInstanceOf(InvoiceAlreadySettledException.class)
                 .hasMessageContaining("has already been settled and cannot be modified");
@@ -50,9 +49,9 @@ class InvoiceEntityTest {
     @DisplayName("AC-5: Settlement Mutability Lock prevents status update of SETTLED invoice")
     void ac5_settledInvoiceCannotBeUpdated() {
         InvoiceEntity invoice = new InvoiceEntity(
-                "LOAD-UK-0841",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+                LoadId.of("LOAD-UK-0841"),
+                ShipperId.generate(),
+                CarrierId.generate(),
                 VehicleType.ARTIC,
                 new BigDecimal("150.00"),
                 createSamplePricing(),
@@ -68,9 +67,9 @@ class InvoiceEntityTest {
     @DisplayName("Non-settled invoice can be cancelled or transitioned")
     void nonSettledInvoiceCanBeModified() {
         InvoiceEntity invoice = new InvoiceEntity(
-                "LOAD-UK-0841",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+                LoadId.of("LOAD-UK-0841"),
+                ShipperId.generate(),
+                CarrierId.generate(),
                 VehicleType.ARTIC,
                 new BigDecimal("150.00"),
                 createSamplePricing(),
@@ -89,9 +88,9 @@ class InvoiceEntityTest {
     void pricingReconstruction() {
         InvoicePricing original = createSamplePricing();
         InvoiceEntity invoice = new InvoiceEntity(
-                "LOAD-UK-0841",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+                LoadId.of("LOAD-UK-0841"),
+                ShipperId.generate(),
+                CarrierId.generate(),
                 VehicleType.ARTIC,
                 new BigDecimal("150.00"),
                 original,

@@ -46,6 +46,21 @@ public final class LedgerGrpcMapper {
         }
     }
 
+    public static com.hozgan.smartpay.common.model.id.AccountId toAccountId(String uuidStr, String fieldName) {
+        return com.hozgan.smartpay.common.model.id.AccountId.of(toUUID(uuidStr, fieldName));
+    }
+
+    public static com.hozgan.smartpay.common.model.id.IdempotencyKey toIdempotencyKey(String keyStr, String fieldName) {
+        if (keyStr == null || keyStr.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " cannot be null or empty");
+        }
+        return com.hozgan.smartpay.common.model.id.IdempotencyKey.of(keyStr.trim());
+    }
+
+    public static com.hozgan.smartpay.common.model.id.TransactionId toTransactionId(String uuidStr, String fieldName) {
+        return com.hozgan.smartpay.common.model.id.TransactionId.of(toUUID(uuidStr, fieldName));
+    }
+
     public static EntryType toEntryType(EntryTypeProto proto) {
         return switch (proto) {
             case DEBIT -> EntryType.DEBIT;
