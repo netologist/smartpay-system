@@ -53,7 +53,7 @@ graph TD
    * **Responsibility**: Orchestrates payment orders, enforces two-tier distributed idempotency, and commits outbox events.
    * **Core Models**: `TransactionalOutbox`, `IdempotencyRecord`.
 4. **Factoring Payout Context (`smartpay-payout-worker`)**:
-   * **Responsibility**: Continuously polls approved freight invoices via Virtual Threads and triggers immediate carrier disbursements.
+   * **Responsibility**: Event-driven worker consuming delivery verification events (`EpodVerifiedEvent`) via Kafka consumer group `smartpay-factoring-workers`. Dispatches non-blocking gRPC calls via Virtual Threads to evaluate carrier credit risk and initiate instant factoring advances without multi-pod collisions.
 5. **Reconciliation Context (`smartpay-recon-service`)**:
    * **Responsibility**: Parses bank CAMT.053 XML and MT940 statements, matching lines to ledger journal transactions via `end_to_end_id`.
 
@@ -76,18 +76,22 @@ The platform employs a hybrid communication strategy:
 │       Invoice Service       │ │       Payment Service       │
 └──────────────┬──────────────┘ └──────────────┬──────────────┘
                │                               │
-               │ Kafka Event                   │ Synchronous gRPC over HTTP/2
-               │ (EpodVerified)                │ (HoldFunds, TransferFunds)
+               │ Kafka Topic                   │ Synchronous gRPC over HTTP/2
+               │ smartpay.events.invoice       │ (HoldFunds, TransferFunds)
+               │ (EpodVerifiedEvent)           │
 ┌──────────────▼──────────────┐ ┌──────────────▼──────────────┐
-│        Payout Worker        │ │        Ledger Service       │
-└──────────────┬──────────────┘ └─────────────────────────────┘
+│   Payout Worker (K8s Pods)  │ │        Ledger Service       │
+│   [Consumer Group:          │ └─────────────────────────────┘
+│    smartpay-factoring-      │
+│    workers]                 │
+└──────────────┬──────────────┘
                │
                │ Synchronous gRPC over HTTP/2
-               │ (InitiatePayment)
+               │ (1. RiskService: EvaluateRisk)
+               │ (2. PaymentService: InitiatePayment)
 ┌──────────────▼──────────────┐
-│       Payment Service       │
+│    Payment / Risk Services   │
 └─────────────────────────────┘
-```
 
 1. **Synchronous RPC (gRPC over HTTP/2)**:
    * **Usage**: Mission-critical operations demanding immediate consistency.

@@ -51,7 +51,7 @@ C4Container
         Container(invoiceService, "Invoice Service", "Spring Boot / Java 25", "ePOD signature verification, freight pricing engine (base + fuel + VAT), invoice lifecycle.")
         Container(ledgerService, "Ledger Service", "Spring Boot / Java 25", "Double-entry general ledger, zero-sum invariant, balance hold/release, atomic transfer engine.")
         Container(paymentService, "Payment Service", "Spring Boot / Java 25", "Payment initiation, Faster Payments/VRP orchestration, Transactional Outbox.")
-        Container(payoutWorker, "Payout Worker", "Spring Boot / Virtual Threads", "Background worker polling verified invoices for instant factoring payouts via Virtual Threads.")
+        Container(payoutWorker, "Payout Worker", "Spring Boot / Java 25", "Event-driven factoring worker consuming EpodVerifiedEvent via Kafka Consumer Groups and executing instant disbursements via Virtual Threads.")
         Container(reconService, "Reconciliation Service", "Spring Boot / Java 25", "CAMT.053 XML / MT940 bank statement ingestion and end_to_end_id ledger reconciliation.")
         Container(riskService, "Risk Service", "Spring Boot / Java 25", "Carrier and shipper credit risk scoring and fraud prevention.")
         Container(notificationService, "Notification Service", "Spring Boot / Java 25", "Event-driven SMS / Email notification engine.")
@@ -67,10 +67,10 @@ C4Container
     Rel(gateway, invoiceService, "Invoice & ePOD calls", "HTTP / REST")
     Rel(gateway, paymentService, "Payment orders", "HTTP / REST")
 
-    Rel(invoiceService, kafka, "EpodVerified, InvoiceIssued", "Kafka Producer")
-    Rel(payoutWorker, invoiceService, "Queries approved invoices", "REST / gRPC")
-    Rel(payoutWorker, paymentService, "Initiates instant payouts", "gRPC over HTTP/2")
-
+    Rel(invoiceService, kafka, "Publishes EpodVerifiedEvent, InvoiceIssuedEvent", "Kafka Producer")
+    Rel(kafka, payoutWorker, "Consumes EpodVerifiedEvent (partitioned group)", "Kafka Consumer Group")
+    Rel(payoutWorker, riskService, "Evaluates carrier credit risk", "gRPC over HTTP/2")
+    Rel(payoutWorker, paymentService, "Initiates factoring payout", "gRPC over HTTP/2")
     Rel(paymentService, ledgerService, "HoldFunds, TransferFunds", "gRPC over HTTP/2 (smartpay-proto)")
     Rel(paymentService, kafka, "Publishes events via Outbox Worker", "Kafka Producer")
 

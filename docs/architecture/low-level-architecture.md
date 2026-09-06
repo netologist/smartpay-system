@@ -162,3 +162,50 @@ Ledger Transaction Match:
 Result: bank_statement_lines.reconciliation_status = 'MATCHED'
         bank_statement_lines.matched_entry_id = <entry_uuid>
 ```
+
+---
+
+## 6. Cloud-Native Worker Concurrency & Kafka Partitioning Model
+
+When executing automated financial workflows such as factoring disbursements across a multi-replica Kubernetes deployment, concurrency models must prevent race conditions and duplicate payouts.
+
+### A) The Inadequacy of Scheduled Polling in Multi-Pod Clusters
+Running periodic `@Scheduled` polling inside a multi-replica deployment (`replicas >= 2`) produces a **multi-pod collision**:
+* Both pods query `invoice-service` concurrently and receive the same list of eligible invoices.
+* Both attempt to initiate payments with the same `IdempotencyKey`. While the two-tier idempotency prevents double-spending, one pod fails with `409 Conflict (IdempotencyConflictException)`, wasting compute resources and triggering false alerts.
+
+### B) Event-Driven Partitioning via Kafka Consumer Groups
+To achieve zero-collision horizontal scaling, `smartpay-payout-worker` adopts **Kafka Consumer Group Partitioning** (`smartpay-factoring-workers`):
+
+```mermaid
+graph TD
+    subgraph Topic: smartpay.events.invoice
+        P0[Partition 0: Carrier A]
+        P1[Partition 1: Carrier B]
+        P2[Partition 2: Carrier C]
+        P3[Partition 3: Carrier D]
+    end
+
+    subgraph K8s Deployment: smartpay-payout-worker
+        Pod1[Worker Pod 1]
+        Pod2[Worker Pod 2]
+    end
+
+    P0 --> Pod1
+    P1 --> Pod1
+    P2 --> Pod2
+    P3 --> Pod2
+
+    Pod1 -->|Thread.ofVirtual()| Exec1[1. Risk gRPC -> 2. Payment gRPC]
+    Pod2 -->|Thread.ofVirtual()| Exec2[1. Risk gRPC -> 2. Payment gRPC]
+```
+
+1. **Deterministic Partition Assignment**:
+   * Events are partitioned by `carrier_id` or `invoice_id`.
+   * Kafka consumer protocol ensures each partition is owned by exactly **one worker pod**.
+   * Rebalancing dynamically redistributes partitions when pods scale up or down (HPA).
+2. **Virtual Thread Offloading**:
+   * Upon message receipt, the consumer worker immediately dispatches processing to an in-memory Java 25 Virtual Thread (`Executors.newVirtualThreadPerTaskExecutor()`).
+   * The blocking gRPC calls to `smartpay-risk-service` and `smartpay-payment-service` yield virtual threads without pinning carrier OS threads.
+3. **Offset Commit Semantics**:
+   * Offset is committed only after `smartpay-payment-service` successfully responds with `INITIATED`, ensuring At-Least-Once delivery and zero missed disbursements.

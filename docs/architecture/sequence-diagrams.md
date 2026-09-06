@@ -47,14 +47,21 @@ Traces invoice advance disbursement, balance hold reservation, and two-tier ledg
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Worker as smartpay-payout-worker
+    participant Kafka as Redpanda / Kafka
+    participant Worker as smartpay-payout-worker (K8s Consumer)
+    participant RiskSvc as smartpay-risk-service
     participant PaymentSvc as smartpay-payment-service
     participant LedgerSvc as smartpay-ledger-service
     participant Bank as ClearBank API
-    participant Kafka as Redpanda / Kafka
+
+    Kafka->>Worker: Consume EpodVerifiedEvent (loadId, carrierId, £1000)
+    Note over Worker: Consumer Group Partitioning:<br/>Exactly one pod assigned per message
 
     Note over Worker: Compute factoring advance:<br/>Total £1000 - 2.5% Fee (£25) = Net £975
-    Worker->>PaymentSvc: gRPC: InitiatePayment (CarrierId, £975, EndToEndId)
+    Worker->>RiskSvc: gRPC: EvaluateCarrierRisk(CarrierId, £1000)
+    RiskSvc-->>Worker: RiskResponse (approved=true, score=15)
+
+    Worker->>PaymentSvc: gRPC: InitiatePayment (Escrow, Carrier, £975, IdempotencyKey)
 
     Note over PaymentSvc: Insert idempotency_records<br/>status = PROCESSING
     PaymentSvc->>LedgerSvc: gRPC: HoldFunds (EscrowAccount, £975, EndToEndId)
@@ -63,7 +70,8 @@ sequenceDiagram
     LedgerSvc-->>PaymentSvc: HoldFundsResponse (new_hold_balance)
 
     PaymentSvc->>PaymentSvc: Insert transactional_outbox (PAYMENT_INITIATED)
-    PaymentSvc-->>Worker: InitiatePaymentResponse (status=PROCESSING)
+    PaymentSvc-->>Worker: InitiatePaymentResponse (status=INITIATED)
+    Worker->>Kafka: Publish FactoringPayoutApprovedEvent (smartpay.events.factoring)
 
     Note over PaymentSvc: Outbox Worker polls event (SKIP LOCKED)
     PaymentSvc->>Bank: Faster Payments API call (£975)
@@ -75,7 +83,6 @@ sequenceDiagram
 
     PaymentSvc->>Kafka: Publish event: PaymentSettledEvent
 ```
-
 ---
 
 ## 3. Bank Statement (CAMT.053) Ingestion & Auto-Reconciliation Flow
