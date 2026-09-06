@@ -15,6 +15,9 @@ import java.util.Currency;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import org.junit.jupiter.api.Tag;
+
+@Tag("unit")
 class FreightPricingEngineTest {
 
     private FreightPricingEngine engine;

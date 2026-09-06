@@ -41,6 +41,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>Verifies HTTP contract: status codes, response JSON shape, RFC 7807 error bodies.
  */
+import org.junit.jupiter.api.Tag;
+
+@Tag("integration")
 @SpringBootTest(webEnvironment = WebEnvironment.MOCK)
 @Import(TestcontainersConfiguration.class)
 @DisplayName("LedgerTransferController — MockMvc Tests")

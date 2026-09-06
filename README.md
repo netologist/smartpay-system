@@ -98,12 +98,21 @@ mvn test-compile
 
 ---
 
-### 4. Run Unit and Architecture Tests (ArchUnit)
-Execute unit tests for Money, typed IDs, converters, and ArchUnit modern architecture fitness functions:
+### 4. Run Test Suites (Unit & Integration Separation)
+All tests are cleanly partitioned using JUnit 5 `@Tag("unit")` and `@Tag("integration")` with dedicated Maven profiles:
+
 ```bash
-mvn clean test -pl smartpay-common
+# 1. Run ALL tests (both unit and integration tests across active modules):
+mvn test -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service
+
+# 2. Run ONLY fast unit tests (in-memory, zero Docker/Testcontainers overhead, ~10s):
+mvn test -Punit
+# (Alternative CLI syntax: mvn test -Dgroups=unit)
+
+# 3. Run ONLY integration tests (PostgreSQL 16 Testcontainers, HTTP/2 gRPC, slice tests):
+mvn test -Pintegration
+# (Alternative CLI syntax: mvn test -Dgroups=integration)
 ```
-*(All 63 tests must pass with 0 failures)*
 
 ---
 

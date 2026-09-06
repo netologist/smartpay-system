@@ -43,6 +43,7 @@ import static org.assertj.core.api.Assertions.*;
  *   <li>Error paths: account not found, insufficient funds, currency mismatch</li>
  * </ul>
  */
+@Tag("integration")
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 @Transactional

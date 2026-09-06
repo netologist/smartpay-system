@@ -9,6 +9,9 @@ import tools.jackson.databind.module.SimpleModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Tag;
+
+@Tag("unit")
 class MoneyJsonComponentTest {
 
     private JsonMapper mapper;

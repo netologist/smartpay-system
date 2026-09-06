@@ -13,6 +13,9 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Tag;
+
+@Tag("unit")
 @DisplayName("UUIDv7 Generator Tests (RFC 9562)")
 class UuidV7Test {
 

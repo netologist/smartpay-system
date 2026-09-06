@@ -28,6 +28,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import org.junit.jupiter.api.Tag;
+
+@Tag("unit")
 @DisplayName("Modern Java 25 & Spring Boot 4.1 Architecture Tests")
 class ArchitectureTest {
 

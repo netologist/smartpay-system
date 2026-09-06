@@ -49,6 +49,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * End-to-end integration tests for {@link LedgerGrpcService} over real HTTP/2 gRPC channel.
  * Uses PostgreSQL 16 Testcontainers with Flyway migrations.
  */
+import org.junit.jupiter.api.Tag;
+
+@Tag("integration")
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 @DisplayName("LedgerGrpcService — Full E2E Integration Tests (Testcontainers)")

@@ -8,6 +8,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Tag;
+
+@Tag("unit")
 class VehicleTypeConverterTest {
 
     private final VehicleTypeConverter converter = new VehicleTypeConverter();

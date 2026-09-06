@@ -31,6 +31,9 @@ import static org.mockito.Mockito.*;
  * <p>No Spring context, no database. Repositories are mocked via Mockito.
  * Verifies the double-entry zero-sum invariant and journal persistence contract.
  */
+import org.junit.jupiter.api.Tag;
+
+@Tag("unit")
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LedgerDomainService — Unit Tests")
 class LedgerDomainServiceTest {

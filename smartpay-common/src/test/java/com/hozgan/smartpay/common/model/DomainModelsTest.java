@@ -19,6 +19,7 @@ import com.hozgan.smartpay.common.model.id.InvoiceId;
 import com.hozgan.smartpay.common.model.id.LoadId;
 import com.hozgan.smartpay.common.model.id.ShipperId;
 import com.hozgan.smartpay.common.model.id.TenantId;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Tag("unit")
 @DisplayName("Domain Models, IDs, Exceptions, and Converters Tests")
 class DomainModelsTest {
 

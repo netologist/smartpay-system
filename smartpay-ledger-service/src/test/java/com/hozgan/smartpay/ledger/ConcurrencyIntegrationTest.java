@@ -38,6 +38,9 @@ import static org.assertj.core.api.Assertions.*;
  * <p>Uses {@link java.util.concurrent.ExecutorService} with Virtual Threads and
  * {@link org.awaitility.Awaitility} to assert on asynchronous outcomes.
  */
+import org.junit.jupiter.api.Tag;
+
+@Tag("integration")
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 @DisplayName("Concurrency — Deadlock-Free & Overdraft-Prevention Tests")
