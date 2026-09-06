@@ -1,0 +1,102 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: smartpay-payout-worker
+  threads:
+    virtual:
+      enabled: true
+  kafka:
+    bootstrap-servers: ${REDPANDA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: smartpay-factoring-workers
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "com.hozgan.smartpay.*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+    listener:
+      ack-mode: manual_immediate
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50.0
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      invoiceService:
+        base-config: default
+      riskService:
+        base-config: default
+      paymentService:
+        base-config: default
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2.0
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+          - io.grpc.StatusRuntimeException
+          - java.lang.IllegalStateException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      invoiceService:
+        base-config: default
+  ratelimiter:
+    instances:
+      invoiceService:
+        limit-for-period: 100
+        limit-refresh-period: 1s
+        timeout-duration: 500ms
+
+smartpay:
+  payout:
+    escrow-account-id: "0191c7a2-9b24-7f11-9a1c-3d842b10a512"
+    tenant-id: "TENANT-UK-01"
+    factoring-fee-percentage: 2.5
+    risk-score-threshold: 40
+    max-daily-advance-pence: 5000000
+    invoice-service-url: ${INVOICE_SERVICE_URL:http://localhost:8081}
+    risk-grpc-host: ${RISK_GRPC_HOST:localhost}
+    risk-grpc-port: ${RISK_GRPC_PORT:9094}
+    payment-grpc-host: ${PAYMENT_GRPC_HOST:localhost}
+    payment-grpc-port: ${PAYMENT_GRPC_PORT:9092}
+    topics:
+      invoice-events: ${INVOICE_EVENTS_TOPIC:smartpay.events.invoice}
+      factoring-events: ${FACTORING_EVENTS_TOPIC:smartpay.events.factoring}
+    consumer-group-id: ${FACTORING_CONSUMER_GROUP_ID:smartpay-factoring-workers}

@@ -32,7 +32,7 @@ This directory contains detailed, production-ready developer story cards for bui
 | **STORY-001** | [Double-Entry Ledger & Atomic Transfer Engine](STORY-001-ledger-double-entry-engine.md) | `smartpay-ledger-service` | P0 | ✅ **Completed** | Zero-sum journal posting, pessimistic balance locking, hold/release lifecycle, Ledger gRPC API on Virtual Threads. |
 | **STORY-002** | [Freight Invoicing & ePOD Pricing Engine](STORY-002-invoice-epod-pricing-engine.md) | `smartpay-invoice-service` | P1 | ✅ **Completed** | Delivery proof (ePOD) cryptographic verification, automated freight pricing (base + fuel + VAT), multi-currency invoices. |
 | **STORY-003** | [Payment Initiation & Transactional Outbox](STORY-003-payment-initiation-outbox.md) | `smartpay-payment-service` | P1 | ✅ **Completed** | Two-tier idempotency, Ledger gRPC hold reservation, `SKIP LOCKED` transactional outbox event persistence. |
-| **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | ⏳ **Ready to Play** | Virtual Thread worker polling approved invoices, applying 2.5% factoring fee, and executing instant payouts. |
+| **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | ✅ **Completed** | Event-driven Virtual Thread worker consuming ePOD events, applying 2.5% factoring fee, and executing instant payouts via Payment gRPC. |
 | **STORY-005** | [Bank Statement & Auto-Reconciliation Engine](STORY-005-bank-reconciliation-engine.md) | `smartpay-recon-service` | P2 | ⏳ **Ready to Play** | Ingesting CAMT.053 XML / MT940 statements, auto-matching lines via `end_to_end_id` against ledger journal entries. |
 | **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | ⏳ **Ready to Play** | SHA-256 request fingerprinting, two-tier locking, response caching, reverse proxy routing. |
 | **STORY-007** | [Carrier Credit Risk & Fraud Evaluation Engine](STORY-007-carrier-risk-fraud-engine.md) | `smartpay-risk-service` | P1 | ⏳ **Ready to Play** | Carrier credit scoring, exposure limit checks, multi-factor fraud detection gRPC API. |
@@ -69,7 +69,7 @@ Following Domain-Driven Design (DDD) bounded contexts and runtime dependency con
                    │ Phase 3: Autonomous Settlement & Factoring│
                    │ [STORY-004] Carrier Factoring & Payout    │
                    │ Module: smartpay-payout-worker            │
-                   │ Status: 🔒 BLOCKED by S-002 & S-003       │
+│ Status: ✅ COMPLETED (S-002 & S-003) │
                    └───────────────────────────────────────────┘
                                          │
                    ┌─────────────────────┴─────────────────────┐
@@ -97,10 +97,9 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
    * **Readiness**: Fully unblocked because `LedgerGrpcService` is active and tested. Handles payment intent creation, balance reservation holds, and the Transactional Outbox pattern.
 
 ### Stage 3: Automated Factoring & Payouts (Requires Stage 2)
-* **`STORY-004` (`smartpay-payout-worker`)** — **STATUS: 🔒 BLOCKED**
-  * **Prerequisites**: Requires **both** `STORY-002` and `STORY-003`.
-  * **Why Blocked?** The worker continuously polls approved freight invoices (`STORY-002`), applies a 2.5% factoring advance fee, and dispatches instant bank payouts by invoking payment orchestration (`STORY-003`).
-
+* **`STORY-004` (`smartpay-payout-worker`)** — **STATUS: ✅ COMPLETED**
+  * **Prerequisites**: Required **both** `STORY-002` and `STORY-003` (both completed).
+  * **Accomplished**: Event-driven worker consuming delivery verification events (`EpodVerifiedEvent`) via Kafka consumer group `smartpay-factoring-workers`, applying 2.5% factoring advance fee, evaluating carrier risk via gRPC, and executing instant Faster Payments disbursements via Payment gRPC on Java 25 Virtual Threads.
 ### Stage 4: Enterprise Ingress & Bank Audit (Closing Phases)
 * **`STORY-005` (`smartpay-recon-service`)** — **STATUS: ⏳ READY**
   * **Prerequisites**: `STORY-001` (Ledger journal entries).
@@ -117,7 +116,7 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **STORY-001** | `smartpay-ledger-service` | `smartpay-common`, `smartpay-proto` | None (Core Provider) | `STORY-003`, `STORY-004`, `STORY-005` | ✅ **Completed** |
 | **STORY-002** | `smartpay-invoice-service` | `smartpay-common` | REST / Domain Events | `STORY-004` | ✅ **Completed** |
-| **STORY-004** | `smartpay-payout-worker` | `STORY-002` (Invoices), `STORY-003` (Payments) | Kafka Events & REST/gRPC | None (Terminal consumer) | 🔒 **Blocked** (Needs S-002 + S-003) |
+| **STORY-004** | `smartpay-payout-worker` | `STORY-002` (Invoices), `STORY-003` (Payments) | Kafka Events & REST/gRPC | None (Terminal consumer) | ✅ **Completed** |
 | **STORY-005** | `smartpay-recon-service` | `smartpay-common`, `STORY-001` (Journals) | JPA / Read Replica | External Auditor Reports | ⏳ **Ready to Play** (Upstream S-001 ready) |
 | **STORY-006** | `smartpay-gateway` | `STORY-002`, `STORY-003` (Downstream routes) | HTTP Reverse Proxy | External Web & Mobile Clients | 🔒 **Blocked** (Needs downstream APIs) |
 

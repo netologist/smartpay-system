@@ -63,7 +63,7 @@ public class InvoiceController {
         return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 
-    @GetMapping("/load/{loadId}")
+    @GetMapping({"/load/{loadId}", "/by-load/{loadId}"})
     public ResponseEntity<InvoiceResponse> getInvoiceByLoadId(@PathVariable String loadId) {
         LoadId typedLoadId = LoadId.of(loadId);
         InvoiceEntity invoice = invoiceService.getInvoiceByLoadId(typedLoadId);
