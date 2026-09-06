@@ -5,62 +5,198 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![gRPC](https://img.shields.io/badge/gRPC-1.70.0-blueviolet.svg)](https://grpc.io/)
 [![Redpanda](https://img.shields.io/badge/Redpanda-v24.2.4-red.svg)](https://redpanda.com/)
+[![Resilience4j](https://img.shields.io/badge/Resilience4j-2.2.0-yellow.svg)](https://resilience4j.readme.io/)
 [![ArchUnit](https://img.shields.io/badge/ArchUnit-1.4.1-lightgrey.svg)](https://www.archunit.org/)
 
-SmartPay is a high-performance, event-driven financial logistics payment platform built with **Java 25 (Virtual Threads)** and **Spring Boot 4.1**, tailored for UK and European freight transport. It delivers immutable double-entry bookkeeping, cryptographic electronic proof of delivery (ePOD) verification, automated freight invoice pricing, instant carrier factoring liquidity, and ISO-20022 bank statement auto-reconciliation.
+---
+
+## 📖 What is SmartPay? (Project Overview for First-Time Readers)
+
+### 🚛 The Real-World Industry Problem
+In UK and European commercial freight logistics, transport operators and independent carriers face crippling cashflow bottlenecks:
+1. **Net-30 to Net-90 Payment Terms**: Shippers typically settle freight invoices 30 to 90 days after delivery. Carriers, however, must immediately pay for fuel, truck leases, and driver wages.
+2. **Fragile Paperwork & Disputes**: Traditional proof of delivery (POD) involves physical paper notes that get lost, delayed, or disputed, delaying payments for weeks.
+3. **Double-Spending & Reconciliation Chaos**: Financial teams manually match bank statement lines to invoices and ledger accounts, resulting in reconciliation backlogs, audit risk, and accounting discrepancies.
+
+### 💡 The SmartPay Solution
+**SmartPay** is an enterprise-grade, event-driven financial logistics platform that automates the entire invoice-to-settlement lifecycle in **sub-second real-time**:
+
+```
+[ Cargo Delivery ] ──▶ [ Cryptographic ePOD ] ──▶ [ Automated Invoice ] ──▶ [ Instant Factoring Payout (<1s) ] ──▶ [ Bank Statement Recon ]
+```
+
+1. **Cryptographic Electronic Proof of Delivery (ePOD)**:
+   Drivers record delivery completions with GPS geolocation, delivery photos, and immutable SHA-256 cryptographic signature digests.
+2. **Automated Freight Pricing Engine**:
+   Invoices are generated dynamically based on vehicle type (Articulated Lorry, Rigid Truck, Van), mileage rates, dynamic fuel surcharges (12%), and statutory VAT (20%) using precision `Money` value objects.
+3. **Instant Carrier Factoring Liquidity (< 1s Payout)**:
+   Upon ePOD verification, carriers receive instant factoring liquidity (gross invoice minus a 2.5% platform fee) disbursed directly over bank rails (Faster Payments / VRP) without waiting 30–90 days.
+4. **Luca Pacioli Double-Entry Ledger**:
+   An immutable, append-only financial general ledger enforcing the strict zero-sum invariant: $\sum \text{Debits} == \sum \text{Credits}$. Balances are guarded against double-spending and deadlocks via strict account-order pessimistic locking.
+5. **Two-Tier Distributed Idempotency**:
+   Cryptographic SHA-256 request fingerprinting paired with database locks ensures that client retries or network replays never produce duplicate withdrawals or payments.
+6. **Automated Bank Reconciliation**:
+   Parses ISO 20022 CAMT.053 XML and SWIFT MT940 bank statement feeds, auto-matching statement entries against ledger records via unique `end_to_end_id` tokens.
 
 ---
 
-## 📑 Documentation Index
+## 🏗️ System Architecture & Event Flow
 
-Comprehensive architecture models, decision records, and developer story cards are organized under `docs/`:
+The platform is structured into bounded contexts interacting via **gRPC over HTTP/2** for synchronous internal RPC, **REST (OpenAPI 3.1)** for public ingress, and **Redpanda (Kafka API)** for event streaming.
 
-* 🏛️ [**C4 Architecture Models (Context, Container, Component, Code)**](docs/architecture/c4-architecture-models.md)
-* 🗺️ [**High-Level Architecture & Bounded Contexts**](docs/architecture/high-level-architecture.md)
-* ⚙️ [**Low-Level Design & Concurrency / Zero-Sum Algorithms**](docs/architecture/low-level-architecture.md)
-* 🔄 [**Sequence Diagrams**](docs/architecture/sequence-diagrams.md)
-* 👥 [**Use Case Diagrams**](docs/architecture/usecase-diagrams.md)
-* 📘 [**gRPC & Protocol Buffers Technical Guide**](docs/architecture/grpc-technical-guide.md)
-* 📜 [**Architecture Decision Records (ADR-001 - ADR-007)**](docs/decisions/README.md)
-* 📑 [**OpenAPI 3.1 REST Specifications**](docs/openapi/README.md)
-* 📋 [**Developer Story Cards (STORY-001 - STORY-006)**](docs/stories/README.md)
-* ⚠️ [**Technical Debt Records (TD-001: Currency Master)**](docs/tech-debt/TD-001-currency-definitions-master-table.md)
+```mermaid
+flowchart TD
+    subgraph Clients["External Actors & Clients"]
+        Shipper["🏢 Shipper Web Portal"]
+        Carrier["🚚 Carrier / Driver Mobile App"]
+        Bank["🏦 UK Banking Rails (Faster Payments / CAMT.053)"]
+        Auditor["📊 Financial Auditor / Finance Ops"]
+    end
+
+    subgraph Ingress["Ingress Layer"]
+        Gateway["smartpay-gateway (Port 8080)<br/>• Reverse Proxy & JWT Auth<br/>• Rate Limiting & Two-Tier Idempotency"]
+    end
+
+    subgraph CoreServices["Microservices (Modern Java 25 & Spring Boot 4.1)"]
+        InvoiceSvc["smartpay-invoice-service (Port 8083)<br/>• ePOD Signature Verification<br/>• Freight Pricing Engine (Base + Fuel + VAT)"]
+        RiskSvc["smartpay-risk-service (Port 8085 / gRPC 9095)<br/>• Carrier Credit Scoring<br/>• Fraud Propensity Evaluation"]
+        PayoutWorker["smartpay-payout-worker (Port 8087)<br/>• 2.5% Factoring Engine<br/>• Virtual Thread Background Worker<br/>• Resilience4j Circuit Breaker & Retry"]
+        PaymentSvc["smartpay-payment-service (Port 8082 / gRPC 9092)<br/>• Payment Orchestration<br/>• Transactional Outbox Engine"]
+        LedgerSvc["smartpay-ledger-service (Port 8081 / gRPC 9091)<br/>• Double-Entry Journal Engine<br/>• Pessimistic Locking & Balances"]
+        ReconSvc["smartpay-recon-service (Port 8084 / gRPC 9094)<br/>• CAMT.053 / MT940 Parser<br/>• Auto-Reconciliation Engine"]
+        NotificationSvc["smartpay-notification-service (Port 8086)<br/>• Multi-Channel Dispatcher (Email/SMS)<br/>• Consumer Idempotency"]
+    end
+
+    subgraph DataInfrastructure["Data & Messaging Infrastructure"]
+        Postgres[("🐘 PostgreSQL 16 (Port 5432)<br/>• UUIDv7 B-Tree Primary Keys<br/>• Append-Only Journal Entries<br/>• SKIP LOCKED Outbox Tables")]
+        Redpanda{{"🐼 Redpanda / Kafka (Port 9092)<br/>• smartpay.events.invoice<br/>• smartpay.events.factoring<br/>• smartpay.events.payment"}}
+    end
+
+    %% External Connections
+    Shipper -->|HTTPS REST| Gateway
+    Carrier -->|HTTPS REST / ePOD| Gateway
+    Bank -->|Bank Statements / Payout Clearance| ReconSvc
+    Auditor -->|Audit Reports| ReconSvc
+
+    %% Gateway Routing
+    Gateway -->|REST Route| InvoiceSvc
+    Gateway -->|REST Route| PaymentSvc
+    Gateway -->|REST Route| LedgerSvc
+
+    %% Core Service Interactions
+    InvoiceSvc -->|Publish EpodVerifiedEvent| Redpanda
+    InvoiceSvc -.-> Postgres
+
+    Redpanda -->|Consume EpodVerifiedEvent| PayoutWorker
+    PayoutWorker -->|1. REST Fetch Invoice| InvoiceSvc
+    PayoutWorker -->|2. gRPC EvaluateRisk| RiskSvc
+    PayoutWorker -->|3. gRPC InitiatePayment| PaymentSvc
+    PayoutWorker -->|4. REST Update Status| InvoiceSvc
+    PayoutWorker -->|5. Publish FactoringPayoutApprovedEvent| Redpanda
+
+    PaymentSvc -->|gRPC HoldFunds / ReleaseHold| LedgerSvc
+    PaymentSvc -->|Transactional Outbox Commit| Postgres
+    PaymentSvc -->|Publish PaymentEvents| Redpanda
+
+    LedgerSvc -.-> Postgres
+    ReconSvc -.-> Postgres
+
+    Redpanda -->|Consume Domain Events| NotificationSvc
+```
 
 ---
 
-## 🌐 Service Port Matrix (Port Mappings)
+## 📑 Complete Documentation Hub
 
-| Service | Module | HTTP Port | gRPC Port | Database | Responsibility |
+Comprehensive architectural specifications, design decision records, and story cards are organized under `docs/`:
+
+### 🏛️ Architecture & Deep-Dive Technical Guides
+* 🗺️ [**High-Level Architecture & Bounded Contexts**](docs/architecture/high-level-architecture.md): DDD bounded contexts, strategic domain boundaries, and integration protocols.
+* ⚙️ [**Low-Level Architecture & Algorithms**](docs/architecture/low-level-architecture.md): Concurrency control, pessimistic lock ordering, Luca Pacioli zero-sum balance algorithm, and UUIDv7 indexing.
+* 🏛️ [**C4 Architecture Models (Context, Container, Component, Code)**](docs/architecture/c4-architecture-models.md): Complete C4 model diagrams and container interactions.
+* 🔄 [**Sequence Diagrams**](docs/architecture/sequence-diagrams.md): End-to-end execution sequences for ePOD delivery, factoring advances, balance transfers, and bank reconciliations.
+* 👥 [**Use Case Diagrams**](docs/architecture/usecase-diagrams.md): Actor use case boundaries across Shippers, Carriers, Bank Rails, and Finance Ops.
+* 📘 [**gRPC & Protocol Buffers Technical Guide**](docs/architecture/grpc-technical-guide.md): Protobuf contract specifications, client stubs, deadlines, and error handling.
+
+---
+
+### 📜 Architecture Decision Records (ADRs)
+* 📑 [**ADR Index & Architecture Governance**](docs/decisions/README.md)
+* [**ADR-001: Adoption of Modern Java 25 & Spring Boot 4.1**](docs/decisions/ADR-001-modern-java-25-and-spring-boot-4.md)
+* [**ADR-002: UUIDv7 Primary Keys for Time-Ordered Database Performance**](docs/decisions/ADR-002-uuidv7-primary-keys.md)
+* [**ADR-003: Double-Entry Immutable General Ledger Engine**](docs/decisions/ADR-003-double-entry-immutable-ledger.md)
+* [**ADR-004: gRPC over HTTP/2 for Internal Microservice Communication**](docs/decisions/ADR-004-grpc-internal-service-communication.md)
+* [**ADR-005: Transactional Outbox Pattern for At-Least-Once Delivery**](docs/decisions/ADR-005-transactional-outbox-event-driven.md)
+* [**ADR-006: Two-Tier Distributed Idempotency with SHA-256 Fingerprinting**](docs/decisions/ADR-006-two-tier-distributed-idempotency.md)
+* [**ADR-007: Redpanda for C++20 Kafka-Compatible Event Streaming**](docs/decisions/ADR-007-redpanda-for-local-development.md)
+* [**ADR-008: Event-Driven Kafka Consumer Groups for Kubernetes Concurrency**](docs/decisions/ADR-008-event-driven-worker-concurrency-in-kubernetes.md)
+
+---
+
+### 📑 API Specifications (OpenAPI 3.1 & Protocol Buffers)
+* 🌐 [**OpenAPI Specifications Overview**](docs/openapi/README.md)
+* 🚪 [**API Gateway Public Ingress (OpenAPI 3.1)**](docs/openapi/gateway-api.yaml)
+* 📄 [**Freight Invoicing & ePOD Service API (OpenAPI 3.1)**](docs/openapi/invoice-service-api.yaml)
+* 💳 [**Payment Orchestration Service API (OpenAPI 3.1)**](docs/openapi/payment-service-api.yaml)
+* 🏦 [**Bank Reconciliation Service API (OpenAPI 3.1)**](docs/openapi/recon-service-api.yaml)
+* 📦 [**Protocol Buffers Contracts (`smartpay-proto`)**](smartpay-proto/src/main/proto/) (`ledger.proto`, `payment.proto`, `risk.proto`, `common.proto`)
+
+---
+
+### 📋 Feature Stories & Engineering Epics
+* 🗂️ [**Story Roadmap, Sequence & Dependency Matrix**](docs/stories/README.md)
+* ✅ [**STORY-001: Double-Entry Ledger & Atomic Transfer Engine**](docs/stories/STORY-001-ledger-double-entry-engine.md)
+* ✅ [**STORY-002: Freight Invoicing & ePOD Pricing Engine**](docs/stories/STORY-002-invoice-epod-pricing-engine.md)
+* ✅ [**STORY-003: Payment Initiation & Transactional Outbox**](docs/stories/STORY-003-payment-initiation-outbox.md)
+* ✅ [**STORY-004: Carrier Factoring & Instant Payout Worker**](docs/stories/STORY-004-payout-factoring-worker.md)
+* ⏳ [**STORY-005: Bank Statement & Auto-Reconciliation Engine**](docs/stories/STORY-005-bank-reconciliation-engine.md)
+* ⏳ [**STORY-006: API Gateway & Distributed Idempotency Filter**](docs/stories/STORY-006-api-gateway-idempotency.md)
+* ⏳ [**STORY-007: Carrier Credit Risk & Fraud Engine**](docs/stories/STORY-007-carrier-risk-fraud-engine.md)
+* ⏳ [**STORY-008: Event-Driven Multi-Channel Notification Engine**](docs/stories/STORY-008-event-driven-notifications.md)
+* ⏳ [**TECH-001: Containerization & K8s Kustomize Engine**](docs/stories/TECH-001-containerization-kustomize-manifests.md)
+* ⏳ [**TECH-002: Enterprise CI Pipeline Automation**](docs/stories/TECH-002-ci-pipeline-automation.md)
+* ⏳ [**TECH-003: KinD Cluster & E2E Smoke Testing Pipeline**](docs/stories/TECH-003-kind-e2e-testing-pipeline.md)
+
+---
+
+### ⚠️ Technical Debt & Engineering Standards
+* 🏛️ [**Agent & Architectural Coding Standards**](AGENTS.md)
+* ⚠️ [**TD-001: Currency Master Definitions Table**](docs/tech-debt/TD-001-currency-definitions-master-table.md)
+* ⚠️ [**TD-002: Test Directory Physical Partitioning**](docs/tech-debt/TD-002-test-directory-physical-partitioning.md)
+
+---
+
+## 🌐 Service Port Matrix
+
+| Service | Module | HTTP Port | gRPC Port | Database | Primary Responsibility |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **API Gateway** | `smartpay-gateway` | `8080` | — | `smartpay_db` | Reverse proxy, JWT auth, rate limiting, two-tier SHA-256 idempotency |
-| **Ledger Service** | `smartpay-ledger-service` | `8081` | `9091` | `smartpay_db` | Double-entry journal posting, balance transfers, hold/release |
-| **Payment Service** | `smartpay-payment-service` | `8082` | `9092` | `smartpay_db` | Faster Payments / VRP orchestration, Transactional Outbox |
+| **API Gateway** | `smartpay-gateway` | `8080` | — | `smartpay_db` | Reverse proxy, JWT auth, rate limiting, two-tier SHA-256 idempotency filter |
+| **Ledger Service** | `smartpay-ledger-service` | `8081` | `9091` | `smartpay_db` | Double-entry journal posting, balance transfers, hold/release lifecycle |
+| **Payment Service** | `smartpay-payment-service` | `8082` | `9092` | `smartpay_db` | Faster Payments / VRP orchestration, Transactional Outbox (`SKIP LOCKED`) |
 | **Invoice Service** | `smartpay-invoice-service` | `8083` | `9093` | `smartpay_db` | ePOD signature verification, freight pricing (base + fuel + VAT) |
 | **Recon Service** | `smartpay-recon-service` | `8084` | `9094` | `smartpay_db` | CAMT.053 XML / MT940 bank statement reconciliation engine |
-| **Risk Service** | `smartpay-risk-service` | `8085` | `9095` | `smartpay_db` | Fraud detection and carrier/shipper credit risk assessment |
+| **Risk Service** | `smartpay-risk-service` | `8085` | `9095` | `smartpay_db` | Carrier credit scoring, exposure limits, fraud propensity evaluation |
 | **Notification Svc** | `smartpay-notification-service`| `8086` | `9096` | `smartpay_db` | Event-driven Email / SMS notification dispatcher |
-| **Payout Worker** | `smartpay-payout-worker` | `8087` | — | `smartpay_db` | Virtual Thread factoring payout background worker |
+| **Payout Worker** | `smartpay-payout-worker` | `8087` | — | Stateless | Virtual Thread factoring payout background worker with Resilience4j |
 | **PostgreSQL 16** | `postgres` | `5432` | — | `smartpay_db` | Primary ACID database with B-Tree UUIDv7 indexes |
-| **Redpanda (Kafka API)** | `redpanda` | `9092` | — | — | Lightweight C++20 event streaming broker (ADR-007) |
+| **Redpanda Broker** | `redpanda` | `9092` | — | — | Lightweight C++20 event streaming broker (Kafka wire-compatible) |
 | **Redpanda Console**| `redpanda-console` | `8090` | — | — | Topic and message monitoring dashboard (`http://localhost:8090`) |
 
 ---
 
-## 🛠️ Local Environment Setup
+## 🛠️ Local Environment & Quick Start
 
 ### 1. Prerequisites
-* **Java 25**:
+* **Java 25 (Project Loom Virtual Threads)**:
   ```bash
   # Via SDKMAN:
   sdk install java 25-open
-  # Or via mise:
-  mise use java@25
   # Verify:
-  java -version # Must output OpenJDK 25
+  java -version # OpenJDK 25
   ```
 * **Apache Maven 3.9+**:
   ```bash
-  mvn -version # Must output Apache Maven 3.9.x
+  mvn -version
   ```
 * **Docker & Docker Compose**:
   ```bash
@@ -69,71 +205,50 @@ Comprehensive architecture models, decision records, and developer story cards a
 
 ---
 
-### 2. Start Infrastructure (Docker Compose)
-Launch PostgreSQL 16, Redpanda (lightweight Kafka broker), and Redpanda Console:
+### 2. Start Infrastructure
+Launch PostgreSQL 16, Redpanda (Kafka API), and Redpanda Console:
 ```bash
 docker compose up -d
 ```
-
-Verify container health:
-```bash
-docker compose ps
-```
-* **PostgreSQL 16**: `localhost:5432` (User: `smartpay_admin`, Password: `smartpay_secret`, DB: `smartpay_db`)
-* **Redpanda (Kafka Wire Protocol)**: `localhost:9092` (Spring Boot connects directly)
-* **Redpanda Console UI**: Open `http://localhost:8090` in browser
+* **PostgreSQL**: `localhost:5432` (`smartpay_db`, user: `smartpay`, pass: `smartpay`)
+* **Redpanda**: `localhost:9092`
+* **Redpanda Console**: Open `http://localhost:8090`
 
 ---
 
-### 3. Generate gRPC Contracts & Compile Project
-First, compile `.proto` contract files to generate Java message and stub classes:
+### 3. Build Contracts & Project
+Compile Protocol Buffers and build all microservice modules:
 ```bash
+# Compile protobuf contracts first
 mvn compile -pl smartpay-proto
-```
 
-Then compile the entire multi-module project:
-```bash
-mvn test-compile
+# Build all modules
+mvn compile
 ```
 
 ---
 
-### 4. Run Test Suites (Unit & Integration Separation)
+### 4. Running Test Suites
 
-The platform enforces a clean partition between fast in-memory unit tests and containerized integration tests using JUnit 5 tags (`@Tag("unit")` vs `@Tag("integration")`) and dedicated Maven profiles:
+SmartPay strictly separates fast in-memory unit tests from containerized integration suites using JUnit 5 tags:
 
-#### 🟢 Unit Tests (`mvn test -Punit`)
-Executes all pure in-memory unit tests (domain models, monetary math, pricing calculations, MapStruct mappers, and ArchUnit architecture fitness functions) with zero Docker/container startup overhead (~6s):
+#### 🟢 Fast Unit Tests (`mvn test -Punit`)
+Executes all pure in-memory unit tests (domain models, pricing math, MapStruct mappers, calculation engines, and ArchUnit architecture fitness rules) with **zero Docker/container footprint** in $< 12\text{ seconds}$:
 ```bash
-# Run unit tests across all modules:
-mvn test -Punit
-
-# Or run unit tests for a specific module:
-mvn test -Punit -pl smartpay-invoice-service
-mvn test -Punit -pl smartpay-ledger-service
-mvn test -Punit -pl smartpay-common
+# Run unit tests across all active modules:
+mvn test -Punit -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service,smartpay-payment-service,smartpay-payout-worker
 ```
 
-#### 🔵 Integration Tests (`mvn test -Pintegration`)
-Executes all full-stack integration tests against real PostgreSQL 16 Testcontainers, HTTP/2 gRPC channels on Loom Virtual Threads, MockMvc slices, and pessimistic lock concurrency suites:
+#### 🔵 Full Integration Tests (`mvn test -Pintegration`)
+Executes full-stack integration suites against Testcontainers PostgreSQL 16, WireMock HTTP endpoints, HTTP/2 gRPC channels on Virtual Threads, and Resilience4j circuit breakers:
 ```bash
-# Run integration tests across all modules:
-mvn test -Pintegration
-
-# Or run integration tests for a specific module:
-mvn test -Pintegration -pl smartpay-invoice-service
-mvn test -Pintegration -pl smartpay-ledger-service
+mvn test -Pintegration -pl smartpay-payout-worker,smartpay-ledger-service,smartpay-payment-service
 ```
 
-#### 🟡 All Tests (Default `mvn test`)
-Executes the full automated test suite (all 150 unit and integration tests) across active modules:
-```bash
-mvn test -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service
-```
 ---
 
-### 5. Run Microservices
-Each service can be started independently via the Spring Boot Maven plugin:
+### 5. Running Microservices Locally
+Services can be launched independently using the Spring Boot Maven plugin:
 
 ```bash
 # 1. Start Ledger Service (HTTP: 8081, gRPC: 9091)
@@ -145,43 +260,9 @@ mvn spring-boot:run -pl smartpay-invoice-service
 # 3. Start Payment Service (HTTP: 8082)
 mvn spring-boot:run -pl smartpay-payment-service
 
-# 4. Start API Gateway (HTTP: 8080)
+# 4. Start Payout Factoring Worker (HTTP: 8087)
+mvn spring-boot:run -pl smartpay-payout-worker
+
+# 5. Start API Gateway (HTTP: 8080)
 mvn spring-boot:run -pl smartpay-gateway
 ```
-
----
-
-## 🗄️ Database Schemas & Flyway Migrations
-
-Flyway migration scripts are maintained in `src/main/resources/db/migration/` across services:
-
-* **`V1__init_accounts_and_balances.sql`** (`smartpay-ledger-service`):
-  * `accounts` table (Chart of Accounts, currency).
-  * `account_balances` table (Cleared balance, hold balance, `@Version` optimistic lock).
-* **`V2__init_double_entry_ledger.sql`** (`smartpay-ledger-service`):
-  * `journal_transactions` table (Transaction header, idempotency key).
-  * `journal_entries` table (Immutable debit/credit lines with UPDATE/DELETE trigger guard).
-* **`V3__init_invoicing_and_epod.sql`** (`smartpay-invoice-service`):
-  * `epod_records` table (ePOD GPS coordinates, S3 photo URL, SHA-256 signature hash).
-  * `invoices` table (Freight invoices, base amount, 12% fuel surcharge, 20% VAT, vehicle type, multi-currency).
-* **`V4__init_transactional_outbox.sql`** (`smartpay-payment-service`):
-  * `transactional_outbox` table (`SKIP LOCKED` indexed At-Least-Once event store).
-* **`V5__init_idempotency_records.sql`** (`smartpay-payment-service` & `smartpay-gateway`):
-  * `idempotency_records` table (Two-tier distributed lock with SHA-256 request body hash).
-* **`V6__init_bank_reconciliation.sql`** (`smartpay-recon-service`):
-  * `bank_statements` & `bank_statement_lines` (CAMT.053 / MT940 statement lines).
-
----
-
-## 🚀 Developer Roadmap (Story-by-Story)
-
-Follow the structured story cards to implement domain logic and services:
-
-1. [**STORY-001: Double-Entry Ledger & Atomic Balance Transfer Engine**](docs/stories/STORY-001-ledger-double-entry-engine.md) *(Start here)*
-2. [**STORY-002: Freight Invoicing & ePOD Pricing Engine**](docs/stories/STORY-002-invoice-epod-pricing-engine.md)
-3. [**STORY-003: Payment Initiation & Transactional Outbox**](docs/stories/STORY-003-payment-initiation-outbox.md)
-4. [**STORY-004: Carrier Factoring & Instant Payout Worker**](docs/stories/STORY-004-payout-factoring-worker.md)
-5. [**STORY-005: Bank Statement & Auto-Reconciliation Engine**](docs/stories/STORY-005-bank-reconciliation-engine.md)
-6. [**STORY-006: API Gateway & Distributed Idempotency Filter**](docs/stories/STORY-006-api-gateway-idempotency.md)
-
-Refer to the [**gRPC Technical Guide**](docs/architecture/grpc-technical-guide.md) for stub usage, protobuf mapping, and error handling.
