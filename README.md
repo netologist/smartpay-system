@@ -99,21 +99,37 @@ mvn test-compile
 ---
 
 ### 4. Run Test Suites (Unit & Integration Separation)
-All tests are cleanly partitioned using JUnit 5 `@Tag("unit")` and `@Tag("integration")` with dedicated Maven profiles:
 
+The platform enforces a clean partition between fast in-memory unit tests and containerized integration tests using JUnit 5 tags (`@Tag("unit")` vs `@Tag("integration")`) and dedicated Maven profiles:
+
+#### 🟢 Unit Tests (`mvn test -Punit`)
+Executes all pure in-memory unit tests (domain models, monetary math, pricing calculations, MapStruct mappers, and ArchUnit architecture fitness functions) with zero Docker/container startup overhead (~6s):
 ```bash
-# 1. Run ALL tests (both unit and integration tests across active modules):
-mvn test -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service
-
-# 2. Run ONLY fast unit tests (in-memory, zero Docker/Testcontainers overhead, ~10s):
+# Run unit tests across all modules:
 mvn test -Punit
-# (Alternative CLI syntax: mvn test -Dgroups=unit)
 
-# 3. Run ONLY integration tests (PostgreSQL 16 Testcontainers, HTTP/2 gRPC, slice tests):
-mvn test -Pintegration
-# (Alternative CLI syntax: mvn test -Dgroups=integration)
+# Or run unit tests for a specific module:
+mvn test -Punit -pl smartpay-invoice-service
+mvn test -Punit -pl smartpay-ledger-service
+mvn test -Punit -pl smartpay-common
 ```
 
+#### 🔵 Integration Tests (`mvn test -Pintegration`)
+Executes all full-stack integration tests against real PostgreSQL 16 Testcontainers, HTTP/2 gRPC channels on Loom Virtual Threads, MockMvc slices, and pessimistic lock concurrency suites:
+```bash
+# Run integration tests across all modules:
+mvn test -Pintegration
+
+# Or run integration tests for a specific module:
+mvn test -Pintegration -pl smartpay-invoice-service
+mvn test -Pintegration -pl smartpay-ledger-service
+```
+
+#### 🟡 All Tests (Default `mvn test`)
+Executes the full automated test suite (all 150 unit and integration tests) across active modules:
+```bash
+mvn test -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service
+```
 ---
 
 ### 5. Run Microservices

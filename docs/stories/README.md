@@ -131,3 +131,31 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
    * Utilize `Executors.newVirtualThreadPerTaskExecutor()` for concurrent task pools.
 4. **Transactional Outbox & Event Streaming**:
    * Never execute dual-writes (DB update + Kafka produce). State mutations and outbox records must be committed in the same database transaction, polled via `SELECT ... FOR UPDATE SKIP LOCKED`.
+
+---
+
+## 🧪 Test Execution Commands (Unit vs Integration)
+
+To run tests efficiently during development, use the partitioned Maven profiles:
+
+* **Unit Tests (`mvn test -Punit`)**:
+  Runs fast, in-memory domain and business logic tests without launching Docker containers (~6s):
+  ```bash
+  mvn test -Punit
+  # Target specific module:
+  mvn test -Punit -pl smartpay-invoice-service
+  ```
+
+* **Integration Tests (`mvn test -Pintegration`)**:
+  Runs full Testcontainers PostgreSQL 16, HTTP/2 gRPC, and MockMvc slice integration tests (~30s):
+  ```bash
+  mvn test -Pintegration
+  # Target specific module:
+  mvn test -Pintegration -pl smartpay-ledger-service
+  ```
+
+* **All Tests Default (`mvn test`)**:
+  Runs all 150 automated tests across modules:
+  ```bash
+  mvn test -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service
+  ```
