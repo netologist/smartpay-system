@@ -1,4 +1,4 @@
-package com.hozgan.smartpay.invoice.controller;
+package com.hozgan.smartpay.invoice.web;
 
 import com.hozgan.smartpay.common.exception.DuplicateLoadException;
 import com.hozgan.smartpay.common.exception.EntityNotFoundException;

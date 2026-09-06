@@ -1,4 +1,4 @@
-package com.hozgan.smartpay.invoice.controller;
+package com.hozgan.smartpay.invoice.web;
 
 import com.hozgan.smartpay.common.exception.DuplicateLoadException;
 import com.hozgan.smartpay.common.exception.EntityNotFoundException;
@@ -66,7 +66,7 @@ class InvoiceControllerTest {
     }
 
     @Test
-    @DisplayName("AC-2: POST /api/v1/invoices creates invoice and returns HTTP 201 with itemized pricing")
+    @DisplayName("AC-2: POST /api/v1/invoices creates invoice and returns HTTP 201 with Money pricing")
     void ac2_createInvoiceReturnsCreated() throws Exception {
         UUID shipperId = UUID.randomUUID();
         UUID carrierId = UUID.randomUUID();
@@ -104,13 +104,17 @@ class InvoiceControllerTest {
                 .andExpect(jsonPath("$.vehicleType").value("ARTIC"))
                 .andExpect(jsonPath("$.status").value("EPOD_VERIFIED"))
                 .andExpect(jsonPath("$.currency").value("GBP"))
-                .andExpect(jsonPath("$.pricing.baseAmount").value("525.00"))
+                // Rich Money representation in DTO
+                .andExpect(jsonPath("$.pricing.baseAmount.amount").value("525.00"))
+                .andExpect(jsonPath("$.pricing.baseAmount.currency").value("GBP"))
+                .andExpect(jsonPath("$.pricing.baseAmount.minorUnits").value(52500))
                 .andExpect(jsonPath("$.pricing.baseAmountPence").value(52500))
-                .andExpect(jsonPath("$.pricing.fuelSurcharge").value("63.00"))
+                .andExpect(jsonPath("$.pricing.fuelSurcharge.amount").value("63.00"))
                 .andExpect(jsonPath("$.pricing.fuelSurchargePence").value(6300))
-                .andExpect(jsonPath("$.pricing.vatAmount").value("117.60"))
+                .andExpect(jsonPath("$.pricing.vatAmount.amount").value("117.60"))
                 .andExpect(jsonPath("$.pricing.vatAmountPence").value(11760))
-                .andExpect(jsonPath("$.pricing.totalAmount").value("705.60"))
+                .andExpect(jsonPath("$.pricing.totalAmount.amount").value("705.60"))
+                .andExpect(jsonPath("$.pricing.totalAmount.minorUnits").value(70560))
                 .andExpect(jsonPath("$.pricing.totalAmountPence").value(70560));
     }
 

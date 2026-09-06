@@ -1,9 +1,10 @@
-package com.hozgan.smartpay.invoice.controller;
+package com.hozgan.smartpay.invoice.web;
 
 import com.hozgan.smartpay.common.exception.EntityNotFoundException;
 import com.hozgan.smartpay.invoice.dto.request.VerifyEpodRequest;
 import com.hozgan.smartpay.invoice.dto.response.EpodRecordResponse;
 import com.hozgan.smartpay.invoice.entity.EpodRecordEntity;
+import com.hozgan.smartpay.invoice.mapper.InvoiceMapper;
 import com.hozgan.smartpay.invoice.service.EpodService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -24,9 +25,11 @@ public class EpodController {
     private static final Logger log = LoggerFactory.getLogger(EpodController.class);
 
     private final EpodService epodService;
+    private final InvoiceMapper invoiceMapper;
 
-    public EpodController(EpodService epodService) {
+    public EpodController(EpodService epodService, InvoiceMapper invoiceMapper) {
         this.epodService = epodService;
+        this.invoiceMapper = invoiceMapper;
     }
 
     @PostMapping("/verify")
@@ -45,7 +48,7 @@ public class EpodController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(EpodRecordResponse.from(saved));
+                .body(invoiceMapper.toEpodResponse(saved));
     }
 
     @GetMapping("/{loadId}")
@@ -53,6 +56,6 @@ public class EpodController {
         EpodRecordEntity epod = epodService.findByLoadId(loadId)
                 .orElseThrow(() -> new EntityNotFoundException("EpodRecord", loadId));
 
-        return ResponseEntity.ok(EpodRecordResponse.from(epod));
+        return ResponseEntity.ok(invoiceMapper.toEpodResponse(epod));
     }
 }

@@ -114,13 +114,13 @@ class InvoiceEpodIntegrationTest {
                 .andExpect(jsonPath("$.loadId").value(loadId))
                 .andExpect(jsonPath("$.vehicleType").value("ARTIC"))
                 .andExpect(jsonPath("$.status").value("EPOD_VERIFIED"))
-                .andExpect(jsonPath("$.pricing.baseAmount").value("525.00"))
+                .andExpect(jsonPath("$.pricing.baseAmount.amount").value("525.00"))
                 .andExpect(jsonPath("$.pricing.baseAmountPence").value(52500))
-                .andExpect(jsonPath("$.pricing.fuelSurcharge").value("63.00"))
+                .andExpect(jsonPath("$.pricing.fuelSurcharge.amount").value("63.00"))
                 .andExpect(jsonPath("$.pricing.fuelSurchargePence").value(6300))
-                .andExpect(jsonPath("$.pricing.vatAmount").value("117.60"))
+                .andExpect(jsonPath("$.pricing.vatAmount.amount").value("117.60"))
                 .andExpect(jsonPath("$.pricing.vatAmountPence").value(11760))
-                .andExpect(jsonPath("$.pricing.totalAmount").value("705.60"))
+                .andExpect(jsonPath("$.pricing.totalAmount.amount").value("705.60"))
                 .andExpect(jsonPath("$.pricing.totalAmountPence").value(70560));
 
         // Verify database persistence in PostgreSQL
@@ -157,13 +157,13 @@ class InvoiceEpodIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.currency").value("EUR"))
-                .andExpect(jsonPath("$.pricing.baseAmount").value("350.00"))
+                .andExpect(jsonPath("$.pricing.baseAmount.amount").value("350.00"))
                 .andExpect(jsonPath("$.pricing.baseAmountPence").value(35000))
-                .andExpect(jsonPath("$.pricing.fuelSurcharge").value("42.00"))
+                .andExpect(jsonPath("$.pricing.fuelSurcharge.amount").value("42.00"))
                 .andExpect(jsonPath("$.pricing.fuelSurchargePence").value(4200))
-                .andExpect(jsonPath("$.pricing.vatAmount").value("78.40"))
+                .andExpect(jsonPath("$.pricing.vatAmount.amount").value("78.40"))
                 .andExpect(jsonPath("$.pricing.vatAmountPence").value(7840))
-                .andExpect(jsonPath("$.pricing.totalAmount").value("470.40"))
+                .andExpect(jsonPath("$.pricing.totalAmount.amount").value("470.40"))
                 .andExpect(jsonPath("$.pricing.totalAmountPence").value(47040));
 
         Optional<InvoiceEntity> persisted = invoiceRepository.findByLoadId(loadId);

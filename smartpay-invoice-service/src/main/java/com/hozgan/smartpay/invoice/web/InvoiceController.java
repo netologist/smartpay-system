@@ -1,9 +1,10 @@
-package com.hozgan.smartpay.invoice.controller;
+package com.hozgan.smartpay.invoice.web;
 
 import com.hozgan.smartpay.common.model.enums.InvoiceStatus;
 import com.hozgan.smartpay.invoice.dto.request.CreateInvoiceRequest;
 import com.hozgan.smartpay.invoice.dto.response.InvoiceResponse;
 import com.hozgan.smartpay.invoice.entity.InvoiceEntity;
+import com.hozgan.smartpay.invoice.mapper.InvoiceMapper;
 import com.hozgan.smartpay.invoice.service.InvoiceService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -28,9 +29,11 @@ public class InvoiceController {
     private static final Logger log = LoggerFactory.getLogger(InvoiceController.class);
 
     private final InvoiceService invoiceService;
+    private final InvoiceMapper invoiceMapper;
 
-    public InvoiceController(InvoiceService invoiceService) {
+    public InvoiceController(InvoiceService invoiceService, InvoiceMapper invoiceMapper) {
         this.invoiceService = invoiceService;
+        this.invoiceMapper = invoiceMapper;
     }
 
     @PostMapping
@@ -48,26 +51,26 @@ public class InvoiceController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(InvoiceResponse.from(invoice));
+                .body(invoiceMapper.toInvoiceResponse(invoice));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<InvoiceResponse> getInvoiceById(@PathVariable UUID id) {
         InvoiceEntity invoice = invoiceService.getInvoiceById(id);
-        return ResponseEntity.ok(InvoiceResponse.from(invoice));
+        return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 
     @GetMapping("/load/{loadId}")
     public ResponseEntity<InvoiceResponse> getInvoiceByLoadId(@PathVariable String loadId) {
         InvoiceEntity invoice = invoiceService.getInvoiceByLoadId(loadId);
-        return ResponseEntity.ok(InvoiceResponse.from(invoice));
+        return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<InvoiceResponse> cancelInvoice(@PathVariable UUID id) {
         log.info("Requesting cancellation for invoice: {}", id);
         InvoiceEntity invoice = invoiceService.cancelInvoice(id);
-        return ResponseEntity.ok(InvoiceResponse.from(invoice));
+        return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 
     @PutMapping("/{id}/status")
@@ -75,6 +78,6 @@ public class InvoiceController {
                                                         @RequestParam("status") InvoiceStatus status) {
         log.info("Updating status for invoice {} to {}", id, status);
         InvoiceEntity invoice = invoiceService.updateInvoiceStatus(id, status);
-        return ResponseEntity.ok(InvoiceResponse.from(invoice));
+        return ResponseEntity.ok(invoiceMapper.toInvoiceResponse(invoice));
     }
 }
