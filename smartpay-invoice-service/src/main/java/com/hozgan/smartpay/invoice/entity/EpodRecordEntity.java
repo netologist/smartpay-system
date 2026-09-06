@@ -49,7 +49,13 @@ public class EpodRecordEntity {
         this.id = UuidV7.generate();
     }
 
-    public EpodRecordEntity(String loadId, UUID carrierId, Instant deliveredAt, GeoLocation location, String photoS3Url, String signatureHash) {
+    public EpodRecordEntity(String loadId,
+                            UUID carrierId,
+                            Instant deliveredAt,
+                            GeoLocation location,
+                            String photoS3Url,
+                            String signatureHash,
+                            boolean verified) {
         this.id = UuidV7.generate();
         this.loadId = loadId;
         this.carrierId = carrierId;
@@ -58,8 +64,12 @@ public class EpodRecordEntity {
         this.longitude = location.longitude();
         this.photoS3Url = photoS3Url;
         this.signatureHash = signatureHash;
-        this.verified = false;
+        this.verified = verified;
         this.createdAt = Instant.now();
+    }
+
+    public void markVerified() {
+        this.verified = true;
     }
 
     public UUID getId() {

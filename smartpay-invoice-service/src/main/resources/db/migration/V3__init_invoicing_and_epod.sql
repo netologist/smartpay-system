@@ -42,7 +42,7 @@ CREATE TABLE invoices (
     CONSTRAINT chk_base_amount CHECK (base_amount_pence >= 0),
     CONSTRAINT chk_total_amount CHECK (total_amount_pence > 0),
     CONSTRAINT chk_invoice_status CHECK (
-        status IN ('DRAFT', 'AWAITING_APPROVAL', 'APPROVED', 'HELD_IN_ESCROW', 'SETTLED', 'PAID', 'DISPUTED', 'CANCELLED')
+        status IN ('DRAFT', 'EPOD_VERIFIED', 'AWAITING_APPROVAL', 'APPROVED', 'FACTORING_APPROVED', 'HELD_IN_ESCROW', 'SETTLED', 'PAID', 'DISPUTED', 'CANCELLED')
     )
 );
 

@@ -1,11 +1,15 @@
 package com.hozgan.smartpay.invoice.entity;
 
+import com.hozgan.smartpay.common.exception.InvoiceAlreadySettledException;
 import com.hozgan.smartpay.common.model.InvoicePricing;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.InvoiceStatus;
 import com.hozgan.smartpay.common.model.enums.VehicleType;
+import com.hozgan.smartpay.common.model.id.InvoiceId;
 import com.hozgan.smartpay.common.util.UuidV7;
+import com.hozgan.smartpay.invoice.converter.VehicleTypeConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -14,6 +18,7 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Currency;
 import java.util.UUID;
 
 @Entity
@@ -32,12 +37,13 @@ public class InvoiceEntity {
     @Column(name = "carrier_id", nullable = false)
     private UUID carrierId;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = VehicleTypeConverter.class)
     @Column(name = "vehicle_type", nullable = false, length = 16)
     private VehicleType vehicleType;
 
     @Column(name = "mileage_miles", nullable = false, precision = 8, scale = 2)
     private BigDecimal mileageMiles;
+
     @Column(name = "currency", nullable = false, length = 3)
     private String currency = "GBP";
 
@@ -67,7 +73,13 @@ public class InvoiceEntity {
         this.id = UuidV7.generate();
     }
 
-    public InvoiceEntity(String loadId, UUID shipperId, UUID carrierId, VehicleType vehicleType, BigDecimal mileageMiles, InvoicePricing pricing, InvoiceStatus status) {
+    public InvoiceEntity(String loadId,
+                         UUID shipperId,
+                         UUID carrierId,
+                         VehicleType vehicleType,
+                         BigDecimal mileageMiles,
+                         InvoicePricing pricing,
+                         InvoiceStatus status) {
         this.id = UuidV7.generate();
         this.loadId = loadId;
         this.shipperId = shipperId;
@@ -82,6 +94,28 @@ public class InvoiceEntity {
         this.status = status;
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
+    }
+
+    /**
+     * AC-5: Enforces settlement mutability lock.
+     * Rejects updates or cancellations if the invoice is already SETTLED.
+     */
+    public void cancel() {
+        assertNotSettled();
+        this.status = InvoiceStatus.CANCELLED;
+        this.updatedAt = Instant.now();
+    }
+
+    public void updateStatus(InvoiceStatus newStatus) {
+        assertNotSettled();
+        this.status = newStatus;
+        this.updatedAt = Instant.now();
+    }
+
+    private void assertNotSettled() {
+        if (this.status == InvoiceStatus.SETTLED) {
+            throw new InvoiceAlreadySettledException(new InvoiceId(this.id));
+        }
     }
 
     public UUID getId() {
@@ -130,6 +164,14 @@ public class InvoiceEntity {
 
     public void setMileageMiles(BigDecimal mileageMiles) {
         this.mileageMiles = mileageMiles;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public long getBaseAmountPence() {
@@ -189,16 +231,8 @@ public class InvoiceEntity {
         this.updatedAt = updatedAt;
     }
 
-    public String getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
-
     public InvoicePricing getPricing() {
-        java.util.Currency cur = java.util.Currency.getInstance(currency);
+        Currency cur = Currency.getInstance(currency);
         return new InvoicePricing(
                 Money.ofMinor(baseAmountPence, cur),
                 Money.ofMinor(fuelSurchargePence, cur),

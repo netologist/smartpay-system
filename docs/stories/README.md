@@ -11,7 +11,7 @@ graph TD
     STORY_001[STORY-001: Ledger Double-Entry Engine<br/>smartpay-ledger-service<br/><b>✅ COMPLETED</b>] --> STORY_003[STORY-003: Payment & Transactional Outbox<br/>smartpay-payment-service<br/><b>⏳ READY TO PLAY</b>]
     STORY_001 --> STORY_005[STORY-005: Bank Statement Reconciliation<br/>smartpay-recon-service<br/><b>⏳ READY TO PLAY</b>]
     
-    STORY_002[STORY-002: Invoice & ePOD Pricing Engine<br/>smartpay-invoice-service<br/><b>⏳ READY TO PLAY</b>] --> STORY_004[STORY-004: Payout Factoring Worker<br/>smartpay-payout-worker<br/><b>🔒 BLOCKED</b>]
+    STORY_002[STORY-002: Invoice & ePOD Pricing Engine<br/>smartpay-invoice-service<br/><b>✅ COMPLETED</b>] --> STORY_004[STORY-004: Payout Factoring Worker<br/>smartpay-payout-worker<br/><b>🔒 BLOCKED</b>]
     STORY_003 --> STORY_004
     STORY_003 --> STORY_006[STORY-006: Distributed Idempotency Gateway<br/>smartpay-gateway<br/><b>🔒 BLOCKED</b>]
 
@@ -19,8 +19,8 @@ graph TD
     classDef ready fill:#1565c0,stroke:#0d47a1,color:#fff,stroke-width:2px;
     classDef blocked fill:#616161,stroke:#424242,color:#fff,stroke-width:2px;
 
-    class STORY_001 completed;
-    class STORY_002,STORY_003,STORY_005 ready;
+    class STORY_001,STORY_002 completed;
+    class STORY_003,STORY_005 ready;
     class STORY_004,STORY_006 blocked;
 ```
 
@@ -31,7 +31,7 @@ graph TD
 | No | Title | Module | Priority | Status | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **STORY-001** | [Double-Entry Ledger & Atomic Transfer Engine](STORY-001-ledger-double-entry-engine.md) | `smartpay-ledger-service` | P0 | ✅ **Completed** | Zero-sum journal posting, pessimistic balance locking, hold/release lifecycle, Ledger gRPC API on Virtual Threads. |
-| **STORY-002** | [Freight Invoicing & ePOD Pricing Engine](STORY-002-invoice-epod-pricing-engine.md) | `smartpay-invoice-service` | P1 | ⏳ **Ready to Play** | Delivery proof (ePOD) cryptographic verification, automated freight pricing (base + fuel + VAT), multi-currency invoices. |
+| **STORY-002** | [Freight Invoicing & ePOD Pricing Engine](STORY-002-invoice-epod-pricing-engine.md) | `smartpay-invoice-service` | P1 | ✅ **Completed** | Delivery proof (ePOD) cryptographic verification, automated freight pricing (base + fuel + VAT), multi-currency invoices. |
 | **STORY-003** | [Payment Initiation & Transactional Outbox](STORY-003-payment-initiation-outbox.md) | `smartpay-payment-service` | P1 | ⏳ **Ready to Play** | Two-tier idempotency, Ledger gRPC hold reservation, `SKIP LOCKED` transactional outbox event persistence. |
 | **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | 🔒 **Blocked** | Virtual Thread worker polling approved invoices, applying 2.5% factoring fee, and executing instant payouts. |
 | **STORY-005** | [Bank Statement & Auto-Reconciliation Engine](STORY-005-bank-reconciliation-engine.md) | `smartpay-recon-service` | P2 | ⏳ **Ready to Play** | Ingesting CAMT.053 XML / MT940 statements, auto-matching lines via `end_to_end_id` against ledger journal entries. |
@@ -56,7 +56,7 @@ Following Domain-Driven Design (DDD) bounded contexts and runtime dependency con
 │ Phase 2 (Track A): Commercial Core   │     │ Phase 2 (Track B): Payment Execution │
 │ [STORY-002] Freight Invoicing & ePOD │     │ [STORY-003] Payment & Outbox Engine  │
 │ Module: smartpay-invoice-service     │     │ Module: smartpay-payment-service     │
-│ Status: ⏳ READY (No external deps)   │     │ Status: ⏳ READY (Consumes gRPC S-001)│
+│ Status: ✅ COMPLETED                                                   │
 └──────────────────┬───────────────────┘     └──────────────────┬───────────────────┘
                    │                                            │
                    └─────────────────────┬──────────────────────┘
@@ -112,8 +112,7 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
 | Story | Service Module | Upstream Dependencies | Integration Method | Downstream Dependents | Playable Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **STORY-001** | `smartpay-ledger-service` | `smartpay-common`, `smartpay-proto` | None (Core Provider) | `STORY-003`, `STORY-004`, `STORY-005` | ✅ **Completed** |
-| **STORY-002** | `smartpay-invoice-service` | `smartpay-common` | REST / Domain Events | `STORY-004` | ⏳ **Ready to Play** (No service deps) |
-| **STORY-003** | `smartpay-payment-service` | `smartpay-common`, `smartpay-proto`, `STORY-001` | gRPC Client (`LedgerService`) | `STORY-004`, `STORY-006` | ⏳ **Ready to Play** (Upstream S-001 ready) |
+| **STORY-002** | `smartpay-invoice-service` | `smartpay-common` | REST / Domain Events | `STORY-004` | ✅ **Completed** |
 | **STORY-004** | `smartpay-payout-worker` | `STORY-002` (Invoices), `STORY-003` (Payments) | Kafka Events & REST/gRPC | None (Terminal consumer) | 🔒 **Blocked** (Needs S-002 + S-003) |
 | **STORY-005** | `smartpay-recon-service` | `smartpay-common`, `STORY-001` (Journals) | JPA / Read Replica | External Auditor Reports | ⏳ **Ready to Play** (Upstream S-001 ready) |
 | **STORY-006** | `smartpay-gateway` | `STORY-002`, `STORY-003` (Downstream routes) | HTTP Reverse Proxy | External Web & Mobile Clients | 🔒 **Blocked** (Needs downstream APIs) |

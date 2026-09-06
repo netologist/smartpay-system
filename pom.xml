@@ -72,12 +72,12 @@
             </dependency>
             <dependency>
                 <groupId>com.hozgan.smartpay</groupId>
-                <artifactId>vrp-invoice-service</artifactId>
+                <artifactId>smartpay-invoice-service</artifactId>
                 <version>${smartpay.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.hozgan.smartpay</groupId>
-                <artifactId>vrp-payment-service</artifactId>
+                <artifactId>smartpay-payment-service</artifactId>
                 <version>${smartpay.version}</version>
             </dependency>
             <dependency>
