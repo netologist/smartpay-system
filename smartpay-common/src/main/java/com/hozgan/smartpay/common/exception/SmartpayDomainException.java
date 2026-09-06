@@ -13,6 +13,7 @@ public abstract sealed class SmartpayDomainException extends RuntimeException
                 LedgerException,
                 IdempotencyException,
                 LogisticsException,
+                PaymentException,
                 ReconciliationException,
                 EntityNotFoundException {
 

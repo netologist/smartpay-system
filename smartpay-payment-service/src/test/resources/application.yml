@@ -1,0 +1,22 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  flyway:
+    enabled: true
+
+smartpay:
+  payment:
+    ledger-grpc-host: localhost
+    ledger-grpc-port: 19090
+    outbox:
+      poll-batch-size: 25
+      poll-interval-ms: 5000
+      worker-threads: 4
+      scheduled-enabled: false
+    idempotency:
+      ttl-hours: 24

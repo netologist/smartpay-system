@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: smartpay-payment-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/smartpay_payment
+    username: smartpay
+    password: smartpay
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: public
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+smartpay:
+  payment:
+    ledger-grpc-host: localhost
+    ledger-grpc-port: 9090
+    outbox:
+      poll-batch-size: 25
+      poll-interval-ms: 500
+      worker-threads: 4
+    idempotency:
+      ttl-hours: 24

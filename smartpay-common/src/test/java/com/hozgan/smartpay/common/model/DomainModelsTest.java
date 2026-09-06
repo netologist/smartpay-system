@@ -17,8 +17,11 @@ import com.hozgan.smartpay.common.model.id.AccountId;
 import com.hozgan.smartpay.common.model.id.CarrierId;
 import com.hozgan.smartpay.common.model.id.InvoiceId;
 import com.hozgan.smartpay.common.model.id.LoadId;
+import com.hozgan.smartpay.common.model.id.PaymentId;
 import com.hozgan.smartpay.common.model.id.ShipperId;
 import com.hozgan.smartpay.common.model.id.TenantId;
+import com.hozgan.smartpay.common.event.PaymentInitiatedEvent;
+import com.hozgan.smartpay.common.model.id.EndToEndId;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -49,11 +52,13 @@ class DomainModelsTest {
             ShipperId shipperId = ShipperId.generate();
             CarrierId carrierId = CarrierId.generate();
             InvoiceId invoiceId = InvoiceId.generate();
+            PaymentId paymentId = PaymentId.generate();
 
             assertThat(shipperId.value().version()).isEqualTo(7);
             assertThat(carrierId.value().version()).isEqualTo(7);
             assertThat(invoiceId.value().version()).isEqualTo(7);
-
+            assertThat(paymentId.value().version()).isEqualTo(7);
+            assertThat(paymentId.asString()).isEqualTo(paymentId.value().toString());
             assertThatThrownBy(() -> new AccountId(null))
                     .isInstanceOf(NullPointerException.class);
             assertThatThrownBy(() -> AccountId.of((String) null))
@@ -222,6 +227,27 @@ class DomainModelsTest {
             OutboxEvent processed = outbox.markProcessed();
             assertThat(processed.isProcessed()).isTrue();
             assertThat(processed.processedAt()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("PaymentInitiatedEvent creation and aggregateId contract")
+        void paymentInitiatedEventContract() {
+            PaymentId paymentId = PaymentId.generate();
+            PaymentInitiatedEvent event = PaymentInitiatedEvent.of(
+                    paymentId,
+                    TenantId.of("T-1"),
+                    AccountId.generate(),
+                    AccountId.generate(),
+                    Money.ofGBP("975.00"),
+                    EndToEndId.of("E2E-123"),
+                    "HOLD-1",
+                    "FASTER_PAYMENTS",
+                    "REF-1"
+            );
+            assertThat(event.eventType()).isEqualTo("PAYMENT_INITIATED");
+            assertThat(event.aggregateId()).isEqualTo(paymentId.toString());
+            assertThat(event.eventId()).isNotNull();
+            assertThat(event.occurredAt()).isNotNull();
         }
     }
 
