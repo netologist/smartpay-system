@@ -14,21 +14,21 @@
 ---
 
 ## 🎯 User Story
-> **As an** Automated Factoring Liquidity Worker,  
-> **I want to** continuously poll verified freight invoices, evaluate risk scores, deduct a 2.5% factoring platform fee, and execute instant payouts via Payment gRPC,  
-> **So that** freight carriers receive instant liquidity upon delivery completion rather than enduring 30-90 day payment cycles, while the platform captures fee revenue.
-
+> **As an** Event-Driven Factoring Liquidity Worker,  
+> **I want to** consume verified delivery events from Kafka in a partitioned consumer group, evaluate carrier credit risk via gRPC, deduct a 2.5% factoring platform fee, and execute instant payouts via Payment gRPC,  
+> **So that** freight carriers receive instant liquidity in real-time (< 1s) upon delivery completion with zero polling overhead or multi-pod race conditions across Kubernetes replicas.
 ---
 
 ## 🔄 End-to-End (E2E) Execution Flow
 
 ```
-1. Scheduled Polling / Kafka Event Trigger
-   │ Either scheduled cron (@Scheduled) or Kafka consumer consumes InvoiceIssuedEvent.
+1. Event-Driven Trigger (Kafka Consumer Group)
+   │ Consumer group `smartpay-factoring-workers` consumes `EpodVerifiedEvent` from topic `smartpay.events.invoice`.
+   │ Kubernetes multi-pod scaling is conflict-free: Kafka partition assignment guarantees
+   │ that exactly one worker pod processes a given delivery event.
    ▼
-2. Invoice Discovery
-   │ Query smartpay-invoice-service for invoices where status = EPOD_VERIFIED.
-   ▼
+2. Invoice & Load Verification
+   │ Fetch invoice details for loadId from smartpay-invoice-service (status = EPOD_VERIFIED).
 3. Factoring Fee Calculation (Domain Service)
    │ - Factoring Fee (2.5%) = Gross Invoice Total * 0.025
    │ - Net Payout Amount = Gross Invoice Total - Factoring Fee
@@ -61,32 +61,33 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Scheduler as FactoringPayoutScheduler
+    participant Kafka as Redpanda / Kafka
+    participant Listener as FactoringEventListener
     participant ThreadPool as Virtual Thread Executor
     participant InvoiceSvc as smartpay-invoice-service
     participant RiskSvc as smartpay-risk-service
     participant PaymentSvc as smartpay-payment-service (gRPC)
-    participant Kafka as Redpanda / Kafka
 
-    Scheduler->>InvoiceSvc: GET /api/v1/invoices?status=EPOD_VERIFIED
-    InvoiceSvc-->>Scheduler: List of eligible invoices (e.g. INV-0841, £1000.00)
+    Kafka->>Listener: Consume EpodVerifiedEvent (loadId, carrierId)
+    Note over Listener: Kafka Consumer Group Partition Assignment<br/>guarantees exactly-one pod assignment in K8s!
+    
+    Listener->>ThreadPool: Dispatch to Thread.ofVirtual()
+    ThreadPool->>InvoiceSvc: GET /api/v1/invoices/by-load/{loadId}
+    InvoiceSvc-->>ThreadPool: Invoice Details (£1000.00, status=EPOD_VERIFIED)
 
-    loop For each invoice in parallel
-        Scheduler->>ThreadPool: Submit payout job (Thread.ofVirtual())
-        
-        Note over ThreadPool: Factoring Engine:<br/>Fee = £1000 * 2.5% = £25.00<br/>Net Payout = £975.00
+    Note over ThreadPool: Factoring Engine:<br/>Fee (2.5%) = £25.00<br/>Net Advance = £975.00
 
-        ThreadPool->>RiskSvc: gRPC: EvaluateRisk(carrierId, invoiceAmount)
-        RiskSvc-->>ThreadPool: RiskEvaluationResponse (approved=true, score=12)
+    ThreadPool->>RiskSvc: gRPC: EvaluateRisk(carrierId, invoiceAmount)
+    RiskSvc-->>ThreadPool: RiskEvaluationResponse (approved=true, score=12)
 
-        ThreadPool->>PaymentSvc: gRPC: InitiatePayment(Escrow, Carrier, £975.00, IdempotencyKey)
-        PaymentSvc-->>ThreadPool: InitiatePaymentResponse (paymentId, status=INITIATED)
+    ThreadPool->>PaymentSvc: gRPC: InitiatePayment(Escrow, Carrier, £975.00, IdempotencyKey)
+    PaymentSvc-->>ThreadPool: InitiatePaymentResponse (paymentId, status=INITIATED)
 
-        ThreadPool->>InvoiceSvc: PUT /api/v1/invoices/{id}/status (status=FACTORING_APPROVED)
-        InvoiceSvc-->>ThreadPool: HTTP 200 OK
+    ThreadPool->>InvoiceSvc: PUT /api/v1/invoices/{id}/status (status=FACTORING_APPROVED)
+    InvoiceSvc-->>ThreadPool: HTTP 200 OK
 
-        ThreadPool->>Kafka: Publish FactoringPayoutApprovedEvent (smartpay.events.factoring)
-    end
+    ThreadPool->>Kafka: Publish FactoringPayoutApprovedEvent (smartpay.events.factoring)
+    ThreadPool->>Listener: Acknowledge Kafka message offset
 ```
 
 ---
@@ -134,6 +135,11 @@ sequenceDiagram
 * **When**: Several external banking or gRPC calls experience transient latency,
 * **Then**: Operating system carrier threads remain unpinned, and healthy invoices proceed without delay.
 
+
+### AC-5: Multi-Pod Kubernetes Partition Safety (No Concurrent Duplication)
+* **Given**: A Kubernetes deployment of `smartpay-payout-worker` running with 4 active replica pods,
+* **When**: Multiple `EpodVerifiedEvent` messages are published to `smartpay.events.invoice`,
+* **Then**: Kafka partition assignments ensure each message is handled by exactly one pod, resulting in zero 409 conflict errors and zero duplicate disbursements.
 ---
 
 ## 🔌 API & Event Payload Contracts
