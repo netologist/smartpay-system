@@ -23,6 +23,9 @@ service LedgerService {
 
   // Releases a previously placed hold
   rpc ReleaseHold (ReleaseHoldRequest) returns (ReleaseHoldResponse);
+
+  // Looks up a posted journal transaction by its end-to-end reference for bank reconciliation
+  rpc GetTransactionByReference (GetTransactionByReferenceRequest) returns (GetTransactionByReferenceResponse);
 }
 
 message GetBalanceRequest {
@@ -101,4 +104,18 @@ message ReleaseHoldResponse {
   string hold_id = 1;
   bool captured = 2;
   smartpay.common.MoneyProto new_available_balance = 3;
+}
+
+message GetTransactionByReferenceRequest {
+  string end_to_end_id = 1;
+}
+
+message GetTransactionByReferenceResponse {
+  string transaction_id = 1;
+  string end_to_end_id = 2;
+  smartpay.common.MoneyProto amount = 3;
+  EntryTypeProto entry_type = 4;
+  string currency = 5;
+  string status = 6; // e.g. "POSTED"
+  int64 posted_at_epoch_ms = 7;
 }

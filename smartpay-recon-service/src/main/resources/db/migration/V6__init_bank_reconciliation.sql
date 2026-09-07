@@ -30,11 +30,11 @@ CREATE TABLE bank_statement_lines (
     currency VARCHAR(3) NOT NULL DEFAULT 'GBP',
     booking_date DATE NOT NULL,
     reconciliation_status VARCHAR(16) NOT NULL DEFAULT 'UNMATCHED',
-    matched_entry_id UUID NULL REFERENCES journal_entries(id) ON DELETE SET NULL,
+    matched_entry_id UUID NULL,  -- ledger transaction UUID; no FK (cross-service boundary)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT chk_stmt_entry_type CHECK (entry_type IN ('DEBIT', 'CREDIT')),
     CONSTRAINT chk_stmt_recon_status CHECK (
-        reconciliation_status IN ('UNMATCHED', 'RECONCILED', 'DISCREPANCY')
+        reconciliation_status IN ('UNMATCHED', 'MATCHED', 'DISCREPANCY', 'MANUALLY_ADJUSTED')
     )
 );
 

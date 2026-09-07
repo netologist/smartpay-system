@@ -17,4 +17,6 @@ public interface BankStatementLineRepository extends JpaRepository<BankStatement
     Optional<BankStatementLineEntity> findByEndToEndId(String endToEndId);
 
     List<BankStatementLineEntity> findByReconciliationStatus(ReconciliationStatus status);
+
+    List<BankStatementLineEntity> findByStatementIdAndReconciliationStatus(UUID statementId, ReconciliationStatus status);
 }

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>MSG-CLEARBANK-20260905-001</MsgId>
+      <CreDtTm>2026-09-05T15:00:00</CreDtTm>
+      <MsgPgntn>
+        <PgNb>1</PgNb>
+        <LastPgInd>true</LastPgInd>
+      </MsgPgntn>
+      <InstgAgt>
+        <FinInstnId>
+          <Nm>ClearBank</Nm>
+        </FinInstnId>
+      </InstgAgt>
+    </GrpHdr>
+    <Stmt>
+      <Id>STMT-CLEARBANK-2026-09-05-001</Id>
+      <CreDtTm>2026-09-05T15:00:00</CreDtTm>
+      <Acct>
+        <Id>12345678</Id>
+        <Ccy>GBP</Ccy>
+      </Acct>
+      <Bal>
+        <Tp>
+          <CdOrPrtry>
+            <Cd>OPBD</Cd>
+          </CdOrPrtry>
+        </Tp>
+        <Amt Ccy="GBP">100000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt>
+          <Dt>2026-09-04</Dt>
+        </Dt>
+      </Bal>
+      <Bal>
+        <Tp>
+          <CdOrPrtry>
+            <Cd>CLBD</Cd>
+          </CdOrPrtry>
+        </Tp>
+        <Amt Ccy="GBP">145000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt>
+          <Dt>2026-09-05</Dt>
+        </Dt>
+      </Bal>
+      <Ntry>
+        <Amt Ccy="GBP">975.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <BookgDt>2026-09-05</BookgDt>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-FACT-0841</EndToEndId>
+            </Refs>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="GBP">50000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt>2026-09-05</BookgDt>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-DEPOSIT-001</EndToEndId>
+            </Refs>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>
