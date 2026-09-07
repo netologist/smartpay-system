@@ -24,6 +24,7 @@ public class TestcontainersConfiguration {
                 .withDatabaseName("smartpay_ledger_test")
                 .withUsername("test")
                 .withPassword("test")
+                .withUrlParam("currentSchema", "ledger")
                 .withReuse(true);
     }
 }

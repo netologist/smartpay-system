@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Flyway Migration: V5__init_idempotency_records.sql
+-- Flyway Migration: V2__init_idempotency_records.sql
 -- Domain: Distributed Two-Tier Idempotency & Tamper Detection
 -- Database: PostgreSQL 16
 -- ==============================================================================

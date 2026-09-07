@@ -14,6 +14,9 @@ spring:
     enabled: true
     baseline-on-migrate: true
     validate-on-migrate: true
+    create-schemas: true
+    schemas: ledger
+    default-schema: ledger
     locations:
       - classpath:db/migration
 
@@ -23,6 +26,7 @@ spring:
     show-sql: true
     properties:
       hibernate:
+        default_schema: ledger
         format_sql: true
 
 

@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Flyway Migration: V3__init_invoicing_and_epod.sql
+-- Flyway Migration: V1__init_invoicing_and_epod.sql
 -- Domain: Freight Loads, Electronic Proof of Delivery (ePOD), Digital Invoicing & VAT
 -- Database: PostgreSQL 16
 -- ==============================================================================

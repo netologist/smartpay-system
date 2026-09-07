@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Flyway Migration: V6__init_bank_reconciliation.sql
+-- Flyway Migration: V1__init_bank_reconciliation.sql
 -- Domain: ISO-20022 CAMT.053 & MT940 Bank Statement Auto-Reconciliation
 -- Database: PostgreSQL 16
 -- ==============================================================================

@@ -2,9 +2,9 @@ spring:
   application:
     name: smartpay-payment-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/smartpay_payment
-    username: smartpay
-    password: smartpay
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:smartpay_db}?currentSchema=payment
+    username: ${DB_USER:smartpay}
+    password: ${DB_PASS:smartpay}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -12,10 +12,13 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        default_schema: public
+        default_schema: payment
     open-in-view: false
   flyway:
     enabled: true
+    create-schemas: true
+    schemas: payment
+    default-schema: payment
     locations: classpath:db/migration
 
 server:

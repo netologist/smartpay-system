@@ -149,7 +149,7 @@ Comprehensive architectural specifications, design decision records, and story c
 * ✅ [**STORY-002: Freight Invoicing & ePOD Pricing Engine**](docs/stories/STORY-002-invoice-epod-pricing-engine.md)
 * ✅ [**STORY-003: Payment Initiation & Transactional Outbox**](docs/stories/STORY-003-payment-initiation-outbox.md)
 * ✅ [**STORY-004: Carrier Factoring & Instant Payout Worker**](docs/stories/STORY-004-payout-factoring-worker.md)
-* ⏳ [**STORY-005: Bank Statement & Auto-Reconciliation Engine**](docs/stories/STORY-005-bank-reconciliation-engine.md)
+* ✅ [**STORY-005: Bank Statement & Auto-Reconciliation Engine**](docs/stories/STORY-005-bank-reconciliation-engine.md)
 * ⏳ [**STORY-006: API Gateway & Distributed Idempotency Filter**](docs/stories/STORY-006-api-gateway-idempotency.md)
 * ⏳ [**STORY-007: Carrier Credit Risk & Fraud Engine**](docs/stories/STORY-007-carrier-risk-fraud-engine.md)
 * ⏳ [**STORY-008: Event-Driven Multi-Channel Notification Engine**](docs/stories/STORY-008-event-driven-notifications.md)
@@ -168,17 +168,17 @@ Comprehensive architectural specifications, design decision records, and story c
 
 ## 🌐 Service Port Matrix
 
-| Service | Module | HTTP Port | gRPC Port | Database | Primary Responsibility |
+| Service | Module | HTTP Port | gRPC Port | Database (Schema) | Primary Responsibility |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **API Gateway** | `smartpay-gateway` | `8080` | — | `smartpay_db` | Reverse proxy, JWT auth, rate limiting, two-tier SHA-256 idempotency filter |
-| **Ledger Service** | `smartpay-ledger-service` | `8081` | `9091` | `smartpay_db` | Double-entry journal posting, balance transfers, hold/release lifecycle |
-| **Payment Service** | `smartpay-payment-service` | `8082` | `9092` | `smartpay_db` | Faster Payments / VRP orchestration, Transactional Outbox (`SKIP LOCKED`) |
-| **Invoice Service** | `smartpay-invoice-service` | `8083` | `9093` | `smartpay_db` | ePOD signature verification, freight pricing (base + fuel + VAT) |
-| **Recon Service** | `smartpay-recon-service` | `8084` | `9094` | `smartpay_db` | CAMT.053 XML / MT940 bank statement reconciliation engine |
-| **Risk Service** | `smartpay-risk-service` | `8085` | `9095` | `smartpay_db` | Carrier credit scoring, exposure limits, fraud propensity evaluation |
-| **Notification Svc** | `smartpay-notification-service`| `8086` | `9096` | `smartpay_db` | Event-driven Email / SMS notification dispatcher |
+| **API Gateway** | `smartpay-gateway` | `8080` | — | `smartpay_db` (`gateway`) | Reverse proxy, JWT auth, rate limiting, two-tier SHA-256 idempotency filter |
+| **Ledger Service** | `smartpay-ledger-service` | `8081` | `9091` | `smartpay_db` (`ledger`) | Double-entry journal posting, balance transfers, hold/release lifecycle |
+| **Payment Service** | `smartpay-payment-service` | `8082` | `9092` | `smartpay_db` (`payment`) | Faster Payments / VRP orchestration, Transactional Outbox (`SKIP LOCKED`) |
+| **Invoice Service** | `smartpay-invoice-service` | `8083` | `9093` | `smartpay_db` (`invoice`) | ePOD signature verification, freight pricing (base + fuel + VAT) |
+| **Recon Service** | `smartpay-recon-service` | `8084` | `9094` | `smartpay_db` (`recon`) | CAMT.053 XML / MT940 bank statement reconciliation engine |
+| **Risk Service** | `smartpay-risk-service` | `8085` | `9095` | `smartpay_db` (`risk`) | Carrier credit scoring, exposure limits, fraud propensity evaluation |
+| **Notification Svc** | `smartpay-notification-service`| `8086` | `9096` | `smartpay_db` (`notification`) | Event-driven Email / SMS notification dispatcher |
 | **Payout Worker** | `smartpay-payout-worker` | `8087` | — | Stateless | Virtual Thread factoring payout background worker with Resilience4j |
-| **PostgreSQL 16** | `postgres` | `5432` | — | `smartpay_db` | Primary ACID database with B-Tree UUIDv7 indexes |
+| **PostgreSQL 16** | `postgres` | `5432` | — | `smartpay_db` | Shared ACID database; each service owns an isolated PostgreSQL schema (`ledger`, `invoice`, `payment`, `recon`, …) with B-Tree UUIDv7 indexes |
 | **Redpanda Broker** | `redpanda` | `9092` | — | — | Lightweight C++20 event streaming broker (Kafka wire-compatible) |
 | **Redpanda Console**| `redpanda-console` | `8090` | — | — | Topic and message monitoring dashboard (`http://localhost:8090`) |
 
@@ -213,6 +213,8 @@ docker compose up -d
 * **PostgreSQL**: `localhost:5432` (`smartpay_db`, user: `smartpay`, pass: `smartpay`)
 * **Redpanda**: `localhost:9092`
 * **Redpanda Console**: Open `http://localhost:8090`
+
+> **Schema isolation**: All services share one PostgreSQL database (`smartpay_db`), but each microservice owns an isolated schema — `ledger`, `invoice`, `payment`, `recon`, `gateway`. On first startup every service's Flyway run creates its own schema automatically (`spring.flyway.create-schemas: true`) and applies its per-service migrations (each service's `db/migration` folder restarts at `V1`), so no schema provisioning is required beforehand.
 
 ---
 

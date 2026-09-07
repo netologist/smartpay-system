@@ -16,6 +16,7 @@ public class TestcontainersConfiguration {
                 .withDatabaseName("smartpay_payment_test")
                 .withUsername("test")
                 .withPassword("test")
+                .withUrlParam("currentSchema", "payment")
                 .withReuse(true);
     }
 }

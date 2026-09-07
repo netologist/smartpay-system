@@ -4,7 +4,7 @@
 * **Target Module**: `smartpay-recon-service`
 * **Priority**: P2 (Financial Control & Bank Statement Reconciliation)
 * **Domain Context**: Bank Statement Reconciliation Bounded Context
-* **Associated Database Tables**: `bank_statements`, `bank_statement_lines` (`V6`)
+* **Associated Database Tables**: `bank_statements`, `bank_statement_lines` (schema `recon`, Flyway `V1`)
 * **Associated Services**: `smartpay-ledger-service` (`smartpay-proto/src/main/proto/ledger.proto`)
 * **Required `smartpay-common` Components**:
   * `Money` (Opening/closing balances, line amounts, currency verification)

@@ -19,6 +19,7 @@ public class TestcontainersConfiguration {
                 .withDatabaseName("smartpay_invoice_test")
                 .withUsername("test")
                 .withPassword("test")
+                .withUrlParam("currentSchema", "invoice")
                 .withReuse(true);
     }
 }

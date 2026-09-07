@@ -16,6 +16,7 @@ public class ReconTestcontainersConfiguration {
                 .withDatabaseName("smartpay_recon_test")
                 .withUsername("test")
                 .withPassword("test")
+                .withUrlParam("currentSchema", "recon")
                 .withReuse(true);
     }
 }

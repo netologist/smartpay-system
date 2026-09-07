@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Flyway Migration: V4__init_transactional_outbox.sql
+-- Flyway Migration: V1__init_transactional_outbox.sql
 -- Domain: Transactional Outbox Pattern for Guaranteed At-Least-Once Kafka Delivery
 -- Database: PostgreSQL 16
 -- ==============================================================================

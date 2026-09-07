@@ -3,9 +3,9 @@ spring:
     name: smartpay-recon-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/smartpay_recon
-    username: smartpay
-    password: smartpay
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:smartpay_db}?currentSchema=recon
+    username: ${DB_USER:smartpay}
+    password: ${DB_PASS:smartpay}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -15,10 +15,13 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        default_schema: public
+        default_schema: recon
 
   flyway:
     enabled: true
+    create-schemas: true
+    schemas: recon
+    default-schema: recon
     locations: classpath:db/migration
     baseline-on-migrate: false
 

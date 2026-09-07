@@ -1,0 +1,94 @@
+# ==============================================================================
+# Per-Service Flyway Migration Job: smartpay-invoice-service
+# Domain: Ledger Bounded Context → PostgreSQL schema "ledger"
+# Pattern: Dedicated Pre-Deployment Migration Job (ArgoCD Sync Wave 1)
+# Security: Principle of Least Privilege (DDL User vs DML User)
+# ==============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: smartpay-invoice-flyway-migration
+  namespace: smartpay
+  labels:
+    app.kubernetes.io/name: smartpay-invoice-flyway-migration
+    app.kubernetes.io/part-of: smartpay-platform
+    app.kubernetes.io/component: db-migration
+    app.kubernetes.io/instance: invoice
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: hook-succeeded
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: smartpay-invoice-flyway-migration
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: flyway-migrator
+          image: flyway/flyway:10.15.0-alpine
+          args:
+            - "-connectRetries=10"
+            - "-connectRetriesInterval=5"
+            - "-lockRetryCount=10"
+            - "migrate"
+          env:
+            # Shared PostgreSQL database; each service owns its own schema.
+            - name: FLYWAY_URL
+              value: "jdbc:postgresql://postgres.smartpay.svc.cluster.local:5432/smartpay_db?sslmode=verify-full&sslrootcert=/etc/ssl/certs/db-ca.crt"
+            - name: FLYWAY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: smartpay-db-ddl-credentials
+                  key: username
+            - name: FLYWAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartpay-db-ddl-credentials
+                  key: password
+            # Own schema only: migrations + Flyway history live in "ledger"
+            - name: FLYWAY_SCHEMAS
+              value: "invoice"
+            - name: FLYWAY_DEFAULT_SCHEMA
+              value: "invoice"
+            - name: FLYWAY_CREATE_SCHEMAS
+              value: "true"
+            - name: FLYWAY_LOCATIONS
+              value: "filesystem:/flyway/sql"
+            - name: FLYWAY_BASELINE_ON_MIGRATE
+              value: "true"
+            - name: FLYWAY_VALIDATE_ON_MIGRATE
+              value: "true"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          volumeMounts:
+            - name: migration-scripts
+              mountPath: /flyway/sql
+              readOnly: true
+            - name: db-ssl-cert
+              mountPath: /etc/ssl/certs
+              readOnly: true
+      volumes:
+        - name: migration-scripts
+          configMap:
+            name: smartpay-invoice-flyway-scripts
+        - name: db-ssl-cert
+          secret:
+            secretName: postgres-ca-cert

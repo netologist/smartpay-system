@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Flyway Migration: V6__init_payments.sql
+-- Flyway Migration: V3__init_payments.sql
 -- Domain: Payment records — source of truth for payment lifecycle state
 -- Database: PostgreSQL 16
 -- ==============================================================================
