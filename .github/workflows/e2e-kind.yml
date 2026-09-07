@@ -140,13 +140,18 @@ jobs:
           # Deploy PostgreSQL 16
           kubectl apply -f scripts/ci/kind-infra-postgres.yaml
           echo "Waiting for PostgreSQL readiness..."
-          kubectl wait --namespace smartpay --for=condition=available deployment/postgres --timeout=90s
+          kubectl wait --namespace smartpay --for=condition=available deployment/postgres --timeout=120s
 
           # Deploy Redpanda
           kubectl apply -f scripts/ci/kind-infra-redpanda.yaml
           echo "Waiting for Redpanda broker readiness..."
-          kubectl wait --namespace smartpay --for=condition=available deployment/redpanda --timeout=90s
-
+          if ! kubectl wait --namespace smartpay --for=condition=available deployment/redpanda --timeout=180s; then
+            echo "❌ Redpanda failed to become ready! Pod diagnostics:"
+            kubectl describe pod -l app=redpanda -n smartpay || true
+            kubectl logs -l app=redpanda -n smartpay --tail=100 || true
+            exit 1
+          fi
+          echo "✅ Redpanda broker is ready."
       - name: Execute Flyway Database Migrations (Sync Wave 1)
         run: |
           echo "Applying all service Flyway migrations..."

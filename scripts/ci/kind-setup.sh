@@ -45,12 +45,17 @@ kubectl create namespace smartpay --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f "${REPO_ROOT}/scripts/ci/kind-infra-postgres.yaml"
 echo "   Waiting for PostgreSQL to be ready..."
-kubectl wait --namespace smartpay --for=condition=available deployment/postgres --timeout=90s
+kubectl wait --namespace smartpay --for=condition=available deployment/postgres --timeout=120s
 
 kubectl apply -f "${REPO_ROOT}/scripts/ci/kind-infra-redpanda.yaml"
 echo "   Waiting for Redpanda broker to be ready..."
-kubectl wait --namespace smartpay --for=condition=available deployment/redpanda --timeout=90s
-
+if ! kubectl wait --namespace smartpay --for=condition=available deployment/redpanda --timeout=180s; then
+  echo "❌ Redpanda failed to become ready! Pod diagnostics:"
+  kubectl describe pod -l app=redpanda -n smartpay || true
+  kubectl logs -l app=redpanda -n smartpay --tail=100 || true
+  exit 1
+fi
+echo "   ✅ Redpanda broker is ready."
 # 5. Synchronize ConfigMaps & Execute Flyway DB Migrations (Sync Wave 1)
 echo "🔄 [4/7] Synchronizing Flyway migration ConfigMaps and executing migration jobs..."
 bash "${REPO_ROOT}/scripts/ci/sync-flyway-configmaps.sh"

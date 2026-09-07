@@ -21,39 +21,43 @@ spec:
     spec:
       containers:
         - name: redpanda
-          image: docker.redpanda.com/redpandadata/redpanda:v24.1.8
+          image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
           command:
             - redpanda
             - start
-            - --overprovisioned
+            - --mode
+            - dev-container
             - --smp
             - "1"
             - --memory
-            - 512M
+            - 768M
             - --reserve-memory
             - 0M
-            - --node-id
-            - "0"
             - --check=false
             - --kafka-addr
             - PLAINTEXT://0.0.0.0:9092
             - --advertise-kafka-addr
             - PLAINTEXT://redpanda.smartpay.svc.cluster.local:9092
+            - --default-log-level=info
           ports:
             - name: kafka
               containerPort: 9092
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
               memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1536Mi
           readinessProbe:
-            tcpSocket:
-              port: 9092
-            initialDelaySeconds: 5
-            periodSeconds: 3
+            exec:
+              command:
+                - rpk
+                - cluster
+                - health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 15
 ---
 apiVersion: v1
 kind: Service
