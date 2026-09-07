@@ -46,6 +46,14 @@ if [[ "${MISSING_JARS}" == "true" ]]; then
   mvn clean package -DskipTests
 fi
 
+# Pre-load infrastructure images into KinD
+echo "📥 Pre-loading infrastructure images (PostgreSQL 16 & Redpanda) into KinD..."
+docker pull postgres:16-alpine
+docker pull docker.redpanda.com/redpandadata/redpanda:v24.2.4
+kind load docker-image postgres:16-alpine --name "${CLUSTER_NAME}"
+kind load docker-image docker.redpanda.com/redpandadata/redpanda:v24.2.4 --name "${CLUSTER_NAME}"
+echo "✅ Infrastructure images cached in KinD."
+
 # Build each service image and load into KinD
 for svc in "${SERVICES[@]}"; do
   JAR_PATH=$(find "${REPO_ROOT}/${svc}/target" -maxdepth 1 -name "${svc}-*.jar" ! -name "*sources*" ! -name "*javadoc*" | head -n 1)

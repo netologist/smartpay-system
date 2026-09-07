@@ -1,6 +1,15 @@
 name: "E2E - Ephemeral KinD Cluster & Smoke Tests"
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "k8s/**"
+      - "docker/**"
+      - "scripts/ci/**"
+      - "smartpay-**/**"
+      - ".github/workflows/e2e-kind.yml"
   pull_request:
     paths:
       - "k8s/**"
@@ -104,6 +113,12 @@ jobs:
 
       - name: Load Container Images into KinD Cluster
         run: |
+          echo "Pre-loading infrastructure images into KinD..."
+          docker pull postgres:16-alpine
+          docker pull docker.redpanda.com/redpandadata/redpanda:v24.2.4
+          kind load docker-image postgres:16-alpine --name smartpay-cluster
+          kind load docker-image docker.redpanda.com/redpandadata/redpanda:v24.2.4 --name smartpay-cluster
+
           SERVICES=(
             "smartpay-gateway"
             "smartpay-ledger-service"
