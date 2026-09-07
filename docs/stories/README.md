@@ -151,28 +151,33 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
 
 ---
 
-## 🧪 Test Execution Commands (Unit vs Integration)
+## 🧪 Test Execution & Quality Commands (Unit vs Integration)
 
-To run tests efficiently during development, use the partitioned Maven profiles:
+To run tests and verify quality efficiently during development, use the partitioned Maven profiles:
 
-* **Unit Tests (`mvn test -Punit`)**:
-  Runs fast, in-memory domain and business logic tests without launching Docker containers (~6s):
+* **Quality Verification & Fast Unit Tests (`mvn verify -Punit`)**:
+  Runs all 257 in-memory unit tests, ArchUnit architecture fitness checks across all microservices, Spotless formatting check, JaCoCo code coverage generation (`target/site/jacoco/`), and Surefire test HTML reports (`target/reports/surefire.html`) in $< 50\text{s}$ with zero Docker/container footprint:
   ```bash
-  mvn test -Punit
-  # Target specific module:
-  mvn test -Punit -pl smartpay-invoice-service
+  mvn verify -Punit
+
+  # Auto-format codebase using Spotless:
+  mvn spotless:apply
   ```
 
-* **Integration Tests (`mvn test -Pintegration`)**:
-  Runs full Testcontainers PostgreSQL 16, HTTP/2 gRPC, and MockMvc slice integration tests (~30s):
+* **Full Integration Tests (`mvn test -Pintegration`)**:
+  Runs full Testcontainers PostgreSQL 16, WireMock, HTTP/2 gRPC, and MockMvc slice integration tests (~30s):
   ```bash
   mvn test -Pintegration
-  # Target specific module:
-  mvn test -Pintegration -pl smartpay-ledger-service
   ```
 
 * **All Tests Default (`mvn test`)**:
-  Runs all 150 automated tests across modules:
+  Runs unit tests across all modules:
   ```bash
-  mvn test -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service
+  mvn test
+  ```
+
+* **Ephemeral KinD End-to-End Test Suite**:
+  ```bash
+  # Full cluster bootstrap, deployment, and 10-phase lifecycle verification:
+  ./scripts/ci/kind-setup.sh
   ```

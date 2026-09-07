@@ -7,6 +7,9 @@
 [![Redpanda](https://img.shields.io/badge/Redpanda-v24.2.4-red.svg)](https://redpanda.com/)
 [![Resilience4j](https://img.shields.io/badge/Resilience4j-2.2.0-yellow.svg)](https://resilience4j.readme.io/)
 [![ArchUnit](https://img.shields.io/badge/ArchUnit-1.4.1-lightgrey.svg)](https://www.archunit.org/)
+[![JaCoCo](https://img.shields.io/badge/JaCoCo-0.8.15-success.svg)](https://www.jacoco.org/)
+[![Spotless](https://img.shields.io/badge/Spotless-2.44.3-informational.svg)](https://github.com/diffplug/spotless)
+[![Docker](https://img.shields.io/badge/Distroless-Non--Root%20UID%2010001-blue.svg)](https://github.com/GoogleContainerTools/distroless)
 
 ---
 
@@ -117,6 +120,7 @@ Comprehensive architectural specifications, design decision records, and story c
 * 🔄 [**Sequence Diagrams**](docs/architecture/sequence-diagrams.md): End-to-end execution sequences for ePOD delivery, factoring advances, balance transfers, and bank reconciliations.
 * 👥 [**Use Case Diagrams**](docs/architecture/usecase-diagrams.md): Actor use case boundaries across Shippers, Carriers, Bank Rails, and Finance Ops.
 * 📘 [**gRPC & Protocol Buffers Technical Guide**](docs/architecture/grpc-technical-guide.md): Protobuf contract specifications, client stubs, deadlines, and error handling.
+* ⚖️ [**Containerization, Tooling & Kubernetes Tradeoffs**](docs/architecture/containerization-and-tooling-tradeoffs.md): Deep-dive tradeoff matrix across container engines, JVM virtual thread tuning, database migrations, and testing topologies.
 
 ---
 
@@ -130,6 +134,8 @@ Comprehensive architectural specifications, design decision records, and story c
 * [**ADR-006: Two-Tier Distributed Idempotency with SHA-256 Fingerprinting**](docs/decisions/ADR-006-two-tier-distributed-idempotency.md)
 * [**ADR-007: Redpanda for C++20 Kafka-Compatible Event Streaming**](docs/decisions/ADR-007-redpanda-for-local-development.md)
 * [**ADR-008: Event-Driven Kafka Consumer Groups for Kubernetes Concurrency**](docs/decisions/ADR-008-event-driven-worker-concurrency-in-kubernetes.md)
+* [**ADR-009: Multi-Stage Distroless Containerization with Custom JRE**](docs/decisions/ADR-009-multi-stage-distroless-containerization.md)
+* [**ADR-010: Event-Driven Multi-Channel Notifications with Consumer Idempotency and DLQ**](docs/decisions/ADR-010-event-driven-notifications-with-idempotency-and-dlq.md)
 
 ---
 
@@ -150,12 +156,12 @@ Comprehensive architectural specifications, design decision records, and story c
 * ✅ [**STORY-003: Payment Initiation & Transactional Outbox**](docs/stories/STORY-003-payment-initiation-outbox.md)
 * ✅ [**STORY-004: Carrier Factoring & Instant Payout Worker**](docs/stories/STORY-004-payout-factoring-worker.md)
 * ✅ [**STORY-005: Bank Statement & Auto-Reconciliation Engine**](docs/stories/STORY-005-bank-reconciliation-engine.md)
-* ⏳ [**STORY-006: API Gateway & Distributed Idempotency Filter**](docs/stories/STORY-006-api-gateway-idempotency.md)
-* ⏳ [**STORY-007: Carrier Credit Risk & Fraud Engine**](docs/stories/STORY-007-carrier-risk-fraud-engine.md)
-* ⏳ [**STORY-008: Event-Driven Multi-Channel Notification Engine**](docs/stories/STORY-008-event-driven-notifications.md)
-* ⏳ [**TECH-001: Containerization & K8s Kustomize Engine**](docs/stories/TECH-001-containerization-kustomize-manifests.md)
-* ⏳ [**TECH-002: Enterprise CI Pipeline Automation**](docs/stories/TECH-002-ci-pipeline-automation.md)
-* ⏳ [**TECH-003: KinD Cluster & E2E Smoke Testing Pipeline**](docs/stories/TECH-003-kind-e2e-testing-pipeline.md)
+* ✅ [**STORY-006: API Gateway & Distributed Idempotency Filter**](docs/stories/STORY-006-api-gateway-idempotency.md)
+* ✅ [**STORY-007: Carrier Credit Risk & Fraud Engine**](docs/stories/STORY-007-carrier-risk-fraud-engine.md)
+* ✅ [**STORY-008: Event-Driven Multi-Channel Notification Engine**](docs/stories/STORY-008-event-driven-notifications.md)
+* ✅ [**TECH-001: Containerization & K8s Kustomize Engine**](docs/stories/TECH-001-containerization-kustomize-manifests.md)
+* ✅ [**TECH-002: Enterprise CI Pipeline Automation**](docs/stories/TECH-002-ci-pipeline-automation.md)
+* ✅ [**TECH-003: KinD Cluster & E2E Testing Pipeline**](docs/stories/TECH-003-kind-e2e-testing-pipeline.md)
 
 ---
 
@@ -174,10 +180,10 @@ Comprehensive architectural specifications, design decision records, and story c
 | **Ledger Service** | `smartpay-ledger-service` | `8081` | `9091` | `smartpay_db` (`ledger`) | Double-entry journal posting, balance transfers, hold/release lifecycle |
 | **Payment Service** | `smartpay-payment-service` | `8082` | `9092` | `smartpay_db` (`payment`) | Faster Payments / VRP orchestration, Transactional Outbox (`SKIP LOCKED`) |
 | **Invoice Service** | `smartpay-invoice-service` | `8083` | `9093` | `smartpay_db` (`invoice`) | ePOD signature verification, freight pricing (base + fuel + VAT) |
-| **Recon Service** | `smartpay-recon-service` | `8084` | `9094` | `smartpay_db` (`recon`) | CAMT.053 XML / MT940 bank statement reconciliation engine |
-| **Risk Service** | `smartpay-risk-service` | `8085` | `9095` | `smartpay_db` (`risk`) | Carrier credit scoring, exposure limits, fraud propensity evaluation |
-| **Notification Svc** | `smartpay-notification-service`| `8086` | `9096` | `smartpay_db` (`notification`) | Event-driven Email / SMS notification dispatcher |
-| **Payout Worker** | `smartpay-payout-worker` | `8087` | — | Stateless | Virtual Thread factoring payout background worker with Resilience4j |
+| **Payout Worker** | `smartpay-payout-worker` | `8084` | — | Stateless | Virtual Thread factoring payout background worker with Resilience4j |
+| **Recon Service** | `smartpay-recon-service` | `8085` | `9094` | `smartpay_db` (`recon`) | CAMT.053 XML / MT940 bank statement reconciliation engine |
+| **Risk Service** | `smartpay-risk-service` | `8086` | `9095` | `smartpay_db` (`risk`) | Carrier credit scoring, exposure limits, fraud propensity evaluation |
+| **Notification Svc** | `smartpay-notification-service`| `8087` | — | `smartpay_db` (`notification`) | Event-driven Email / SMS / Webhook notification engine |
 | **PostgreSQL 16** | `postgres` | `5432` | — | `smartpay_db` | Shared ACID database; each service owns an isolated PostgreSQL schema (`ledger`, `invoice`, `payment`, `recon`, …) with B-Tree UUIDv7 indexes |
 | **Redpanda Broker** | `redpanda` | `9092` | — | — | Lightweight C++20 event streaming broker (Kafka wire-compatible) |
 | **Redpanda Console**| `redpanda-console` | `8090` | — | — | Topic and message monitoring dashboard (`http://localhost:8090`) |
@@ -234,37 +240,91 @@ mvn compile
 
 SmartPay strictly separates fast in-memory unit tests from containerized integration suites using JUnit 5 tags:
 
-#### 🟢 Fast Unit Tests (`mvn test -Punit`)
-Executes all pure in-memory unit tests (domain models, pricing math, MapStruct mappers, calculation engines, and ArchUnit architecture fitness rules) with **zero Docker/container footprint** in $< 12\text{ seconds}$:
+#### 🟢 Fast Unit Tests & Quality Verification (`mvn verify -Punit`)
+Executes the full quality pipeline across all 11 modules in $< 50\text{ seconds}$ with **zero Docker/container footprint**:
+* In-memory unit tests across all domain models, pricing math, MapStruct mappers, and calculation engines.
+* **ArchUnit architecture fitness tests** across all microservices enforcing `.web` packaging, constructor injection, and Project Loom non-pinning.
+* **Spotless code formatting & linting** check.
+* **JaCoCo code coverage generation** producing HTML reports under `${module}/target/site/jacoco/index.html`.
+* **Surefire test report generation** producing HTML reports under `${module}/target/reports/surefire.html`.
 ```bash
-# Run unit tests across all active modules:
-mvn test -Punit -pl smartpay-common,smartpay-ledger-service,smartpay-invoice-service,smartpay-payment-service,smartpay-payout-worker
+mvn verify -Punit
+
+# Format codebase using Spotless:
+mvn spotless:apply
 ```
 
 #### 🔵 Full Integration Tests (`mvn test -Pintegration`)
 Executes full-stack integration suites against Testcontainers PostgreSQL 16, WireMock HTTP endpoints, HTTP/2 gRPC channels on Virtual Threads, and Resilience4j circuit breakers:
 ```bash
-mvn test -Pintegration -pl smartpay-payout-worker,smartpay-ledger-service,smartpay-payment-service
+mvn test -Pintegration
 ```
 
 ---
 
-### 5. Running Microservices Locally
+### 5. Ephemeral KinD Multi-Node Cluster & End-to-End Testing (TECH-003)
+
+SmartPay provides automated one-command provisioning and verification for local Kubernetes testing:
+
+#### ☸️ One-Command KinD Setup & E2E Runner (`scripts/ci/kind-setup.sh`)
+Provisions a 3-node KinD cluster (1 control-plane, 2 workers with port mappings `80/443`), installs NGINX Ingress controller, deploys PostgreSQL 16 & Redpanda, applies Flyway migrations, builds/loads distroless container images, rolls out microservices via Kustomize dev overlay, and executes automated E2E tests:
+```bash
+chmod +x scripts/ci/kind-setup.sh
+./scripts/ci/kind-setup.sh smartpay-cluster
+```
+
+#### 🧪 Full 10-Phase E2E Lifecycle Journey (`scripts/ci/e2e-full-lifecycle-test.sh`)
+Executes all 10 stages of the end-to-end commercial freight payment lifecycle:
+```bash
+chmod +x scripts/ci/e2e-full-lifecycle-test.sh
+./scripts/ci/e2e-full-lifecycle-test.sh
+```
+
+#### 🔍 Live Kafka / Redpanda Topic & Consumer Group Inspector (`scripts/ci/inspect-kafka-topics.sh`)
+Inspects live event streams, consumer group offsets, and consumer lag directly on Redpanda:
+```bash
+chmod +x scripts/ci/inspect-kafka-topics.sh
+
+# Summary of all topics and consumer groups:
+./scripts/ci/inspect-kafka-topics.sh summary
+
+# Consume recent settlement stream messages in JSON format:
+./scripts/ci/inspect-kafka-topics.sh consume smartpay.events.payment 5
+
+# Inspect consumer group lag (factoring workers & notification workers):
+./scripts/ci/inspect-kafka-topics.sh lag
+
+# Inspect Dead Letter Queue (DLQ):
+./scripts/ci/inspect-kafka-topics.sh dlq
+```
+
+---
+
+### 6. Running Microservices Locally
 Services can be launched independently using the Spring Boot Maven plugin:
 
 ```bash
 # 1. Start Ledger Service (HTTP: 8081, gRPC: 9091)
 mvn spring-boot:run -pl smartpay-ledger-service
 
-# 2. Start Invoice & ePOD Service (HTTP: 8083)
-mvn spring-boot:run -pl smartpay-invoice-service
-
-# 3. Start Payment Service (HTTP: 8082)
+# 2. Start Payment Service (HTTP: 8082, gRPC: 9092)
 mvn spring-boot:run -pl smartpay-payment-service
 
-# 4. Start Payout Factoring Worker (HTTP: 8087)
+# 3. Start Invoice & ePOD Service (HTTP: 8083, gRPC: 9093)
+mvn spring-boot:run -pl smartpay-invoice-service
+
+# 4. Start Payout Factoring Worker (HTTP: 8084)
 mvn spring-boot:run -pl smartpay-payout-worker
 
-# 5. Start API Gateway (HTTP: 8080)
+# 5. Start Bank Reconciliation Service (HTTP: 8085, gRPC: 9094)
+mvn spring-boot:run -pl smartpay-recon-service
+
+# 6. Start Risk & Fraud Service (HTTP: 8086, gRPC: 9095)
+mvn spring-boot:run -pl smartpay-risk-service
+
+# 7. Start Notification Service (HTTP: 8087)
+mvn spring-boot:run -pl smartpay-notification-service
+
+# 8. Start API Gateway Ingress (HTTP: 8080)
 mvn spring-boot:run -pl smartpay-gateway
 ```
