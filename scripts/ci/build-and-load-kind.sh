@@ -49,9 +49,9 @@ fi
 # Pre-load infrastructure images into KinD
 echo "📥 Pre-loading infrastructure images (PostgreSQL 16 & Redpanda) into KinD..."
 docker pull postgres:16-alpine
-docker pull docker.redpanda.com/redpandadata/redpanda:v24.2.4
+docker pull redpandadata/redpanda:v24.2.4
 kind load docker-image postgres:16-alpine --name "${CLUSTER_NAME}"
-kind load docker-image docker.redpanda.com/redpandadata/redpanda:v24.2.4 --name "${CLUSTER_NAME}"
+kind load docker-image redpandadata/redpanda:v24.2.4 --name "${CLUSTER_NAME}"
 echo "✅ Infrastructure images cached in KinD."
 
 # Build each service image and load into KinD

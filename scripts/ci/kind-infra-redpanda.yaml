@@ -1,5 +1,6 @@
 # ==============================================================================
 # Ephemeral KinD Infrastructure: Redpanda (Single-Node Kafka Wire-Compatible Broker)
+# Pattern: Proven configuration from vrp-system
 # ==============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -7,8 +8,9 @@ metadata:
   name: redpanda
   namespace: smartpay
   labels:
+    app: redpanda
     app.kubernetes.io/name: redpanda
-    app.kubernetes.io/component: message-broker
+    app.kubernetes.io/part-of: smartpay
 spec:
   replicas: 1
   selector:
@@ -21,43 +23,27 @@ spec:
     spec:
       containers:
         - name: redpanda
-          image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
+          image: redpandadata/redpanda:v24.2.4
           command:
             - redpanda
             - start
-            - --mode
-            - dev-container
-            - --smp
-            - "1"
-            - --memory
-            - 768M
-            - --reserve-memory
-            - 0M
+            - --overprovisioned
+            - --smp=1
+            - --memory=512M
+            - --reserve-memory=0M
+            - --node-id=0
             - --check=false
-            - --kafka-addr
-            - PLAINTEXT://0.0.0.0:9092
-            - --advertise-kafka-addr
-            - PLAINTEXT://redpanda.smartpay.svc.cluster.local:9092
-            - --default-log-level=info
+            - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+            - --advertise-kafka-addr=PLAINTEXT://redpanda.smartpay.svc.cluster.local:9092
           ports:
-            - name: kafka
-              containerPort: 9092
+            - containerPort: 9092
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
+              memory: 256Mi
             limits:
               cpu: 1000m
-              memory: 1536Mi
-          readinessProbe:
-            exec:
-              command:
-                - rpk
-                - cluster
-                - health
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            failureThreshold: 15
+              memory: 1024Mi
 ---
 apiVersion: v1
 kind: Service
@@ -65,12 +51,10 @@ metadata:
   name: redpanda
   namespace: smartpay
   labels:
-    app.kubernetes.io/name: redpanda
+    app: redpanda
 spec:
-  type: ClusterIP
   selector:
     app: redpanda
   ports:
-    - name: kafka
-      port: 9092
+    - port: 9092
       targetPort: 9092

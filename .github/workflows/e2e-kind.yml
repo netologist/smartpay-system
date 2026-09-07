@@ -123,9 +123,9 @@ jobs:
         run: |
           echo "Pre-loading infrastructure images into KinD..."
           docker pull postgres:16-alpine
-          docker pull docker.redpanda.com/redpandadata/redpanda:v24.2.4
+          docker pull redpandadata/redpanda:v24.2.4
           kind load docker-image postgres:16-alpine --name smartpay-cluster
-          kind load docker-image docker.redpanda.com/redpandadata/redpanda:v24.2.4 --name smartpay-cluster
+          kind load docker-image redpandadata/redpanda:v24.2.4 --name smartpay-cluster
 
           SERVICES=(
             "smartpay-gateway"
