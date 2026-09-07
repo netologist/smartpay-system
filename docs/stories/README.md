@@ -12,15 +12,15 @@ This directory contains detailed, production-ready developer story cards for bui
     
     STORY_002[STORY-002: Invoice & ePOD Pricing Engine<br/>smartpay-invoice-service<br/><b>✅ COMPLETED</b>] --> STORY_004[STORY-004: Factoring Payout Worker<br/>smartpay-payout-worker<br/><b>✅ COMPLETED</b>]
     STORY_003 --> STORY_004
-    STORY_003 --> STORY_006[STORY-006: Distributed Idempotency Gateway<br/>smartpay-gateway<br/><b>⏳ READY TO PLAY</b>]
+    STORY_003 --> STORY_006[STORY-006: Distributed Idempotency Gateway<br/>smartpay-gateway<br/><b>✅ COMPLETED</b>]
     STORY_007[STORY-007: Risk & Fraud Engine<br/>smartpay-risk-service<br/><b>⏳ READY TO PLAY</b>] --> STORY_004
     STORY_003 --> STORY_008[STORY-008: Notification Engine<br/>smartpay-notification-service<br/><b>⏳ READY TO PLAY</b>]
     classDef completed fill:#2e7d32,stroke:#1b5e20,color:#fff,stroke-width:2px;
     classDef ready fill:#1565c0,stroke:#0d47a1,color:#fff,stroke-width:2px;
     classDef blocked fill:#616161,stroke:#424242,color:#fff,stroke-width:2px;
 
-    class STORY_001,STORY_002,STORY_003,STORY_004,STORY_005 completed;
-    class STORY_006,STORY_007,STORY_008 ready;
+    class STORY_001,STORY_002,STORY_003,STORY_004,STORY_005,STORY_006 completed;
+    class STORY_007,STORY_008 ready;
 ```
 
 ---
@@ -34,7 +34,7 @@ This directory contains detailed, production-ready developer story cards for bui
 | **STORY-003** | [Payment Initiation & Transactional Outbox](STORY-003-payment-initiation-outbox.md) | `smartpay-payment-service` | P1 | ✅ **Completed** | Two-tier idempotency, Ledger gRPC hold reservation, `SKIP LOCKED` transactional outbox event persistence. |
 | **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | ✅ **Completed** | Event-driven Virtual Thread worker consuming ePOD events, applying 2.5% factoring fee, and executing instant payouts via Payment gRPC. |
 | **STORY-005** | [Bank Statement & Auto-Reconciliation Engine](STORY-005-bank-reconciliation-engine.md) | `smartpay-recon-service` | P2 | ✅ **Completed** | XXE-hardened CAMT.053 ingestion, four-invariant auto-matching via `end_to_end_id` against ledger gRPC, MATCHED/DISCREPANCY transitions, line query API. |
-| **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | ⏳ **Ready to Play** | SHA-256 request fingerprinting, two-tier locking, response caching, reverse proxy routing. |
+| **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | ✅ **Completed** | Edge RS256 JWT + tenant isolation, per-IP token bucket rate limiting, servlet two-tier SHA-256 idempotency filter (PROCESSING/COMPLETED/FAILED + TTL reclaim), reverse-proxy route table with response caching and RFC 7807 problem details. |
 | **STORY-007** | [Carrier Credit Risk & Fraud Evaluation Engine](STORY-007-carrier-risk-fraud-engine.md) | `smartpay-risk-service` | P1 | ⏳ **Ready to Play** | Carrier credit scoring, exposure limit checks, multi-factor fraud detection gRPC API. |
 | **STORY-008** | [Event-Driven Multi-Channel Notification Engine](STORY-008-event-driven-notifications.md) | `smartpay-notification-service` | P2 | ⏳ **Ready to Play** | Consumer group processing of payment/invoice events, templated SMS/Email dispatch, idempotency, DLQ. |
 | **TECH-001** | [Containerization & K8s Kustomize Engine](TECH-001-containerization-kustomize-manifests.md) | `k8s/`, `docker/` | P0 | ⏳ **Ready to Play** | Distroless Java 25 multi-stage Dockerfiles, Kustomize base & overlays (dev/staging/prod). |
@@ -78,7 +78,7 @@ Following Domain-Driven Design (DDD) bounded contexts and runtime dependency con
 │ Phase 4 (Audit): Bank Reconciliation │     │ Phase 4 (Ingress): Gateway & Security│
 │ [STORY-005] Bank Statement Recon     │     │ [STORY-006] Gateway Idempotency      │
 │ Module: smartpay-recon-service       │     │ Module: smartpay-gateway             │
-│ Status: ✅ COMPLETED (Reconciles S-001)│     │ Status: 🔒 BLOCKED by S-003          │
+│ Status: ✅ COMPLETED (Reconciles S-001)│     │ Status: ✅ COMPLETED (Cache replay)   │
 └──────────────────────────────────────┘     └──────────────────────────────────────┘
 ```
 
@@ -104,9 +104,9 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
 * **`STORY-005` (`smartpay-recon-service`)** — **STATUS: ✅ COMPLETED**
   * **Prerequisites**: `STORY-001` (Ledger journal entries).
   * **Accomplished**: XXE-hardened CAMT.053 XML ingestion via `POST /api/v1/recon/statements/upload`, automated matching of statement lines to ledger transactions over gRPC `GetTransactionByReference` with four invariant checks (existence, exact-penny amount, currency, entry direction), `MATCHED`/`DISCREPANCY` status transitions, and a statement-line query endpoint. 17 tests (12 unit + 5 integration) passing.
-* **`STORY-006` (`smartpay-gateway`)** — **STATUS: 🔒 BLOCKED**
+* **`STORY-006` (`smartpay-gateway`)** — **STATUS: ✅ COMPLETED**
   * **Prerequisites**: Downstream REST services (`STORY-002`, `STORY-003`).
-  * **Role**: Public API ingress enforcing distributed idempotency caching (Redis/DB) and JWT verification before reverse-proxying requests to internal microservices. Best completed after the core REST services are established so routing can be verified end-to-end.
+  * **Accomplished**: Edge perimeter for `smartpay-payment-service`/`smartpay-invoice-service` with an ordered servlet filter chain — strict security headers + CORS allow-list, token-bucket rate limiting (100 req/min/IP), dependency-free RS256 JWT verification with `tenant_id` claim injection as `X-Tenant-Id` (caller `Authorization` is never forwarded), and a two-tier SHA-256 idempotency filter over `idempotency_records` (gateway schema, Flyway V1) that rejects missing keys (400), detects in-flight conflicts (409), replays completed responses with `X-Cache: IDEMPOTENT-HIT` bypassing the downstream, rejects altered payloads (422), and releases FAILED/expired slots for retry. Reverse-proxy routing passes through non-mutating traffic and emits RFC 7807 problem details. 39 tests (21 unit + 18 integration) passing.
 
 ---
 
@@ -118,7 +118,7 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
 | **STORY-002** | `smartpay-invoice-service` | `smartpay-common` | REST / Domain Events | `STORY-004` | ✅ **Completed** |
 | **STORY-004** | `smartpay-payout-worker` | `STORY-002` (Invoices), `STORY-003` (Payments) | Kafka Events & REST/gRPC | None (Terminal consumer) | ✅ **Completed** |
 | **STORY-005** | `smartpay-recon-service` | `smartpay-common`, `STORY-001` (Journals) | gRPC `GetTransactionByReference` | External Auditor Reports | ✅ **Completed** |
-| **STORY-006** | `smartpay-gateway` | `STORY-002`, `STORY-003` (Downstream routes) | HTTP Reverse Proxy | External Web & Mobile Clients | 🔒 **Blocked** (Needs downstream APIs) |
+| **STORY-006** | `smartpay-gateway` | `STORY-002`, `STORY-003` (Downstream routes) | HTTP Reverse Proxy | External Web & Mobile Clients | ✅ **Completed** |
 
 ---
 

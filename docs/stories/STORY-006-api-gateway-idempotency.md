@@ -4,7 +4,7 @@
 * **Target Module**: `smartpay-gateway`
 * **Priority**: P2 (Ingress Perimeter Security & Edge Idempotency)
 * **Domain Context**: API Gateway & Perimeter Ingress Bounded Context
-* **Associated Database Tables**: `idempotency_records` (`V5`)
+* **Associated Database Tables**: `idempotency_records` (gateway schema, Flyway `V1`)
 * **Required `smartpay-common` Components**:
   * `TenantId`, `IdempotencyKey` (Strongly-typed IDs)
   * `IdempotencyStatus` (`PROCESSING`, `COMPLETED`, `FAILED`)

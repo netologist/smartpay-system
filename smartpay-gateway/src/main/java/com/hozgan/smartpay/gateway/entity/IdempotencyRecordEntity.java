@@ -7,6 +7,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -27,6 +29,7 @@ public class IdempotencyRecordEntity {
     @Column(name = "response_code")
     private Integer responseCode;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "response_body", columnDefinition = "JSONB")
     private String responseBody;
 

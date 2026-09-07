@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: smartpay-gateway
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:smartpay_db}?currentSchema=gateway
+    username: ${DB_USER:smartpay}
+    password: ${DB_PASS:smartpay}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: gateway
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    create-schemas: true
+    schemas: gateway
+    default-schema: gateway
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+smartpay:
+  gateway:
+    idempotency:
+      # Retention window for idempotency_records. Completed keys are replayed (cache hit)
+      # within this window; expired rows are reclaimed for a fresh attempt.
+      ttl-hours: 24
+    http:
+      # Outbound proxy timeouts to downstream microservices.
+      connect-timeout-ms: 2000
+      read-timeout-ms: 10000
+    rate-limit:
+      # Token bucket: 100 requests/minute per client IP (burst capacity == refill rate).
+      capacity: 100
+      refill-per-minute: 100
+      trust-forwarded-for: true
+    security:
+      # Edge JWT (RS256) verification. When enabled a public key MUST be configured,
+      # otherwise the gateway fails fast rather than silently running unauthenticated.
+      enabled: ${SMARTPAY_GATEWAY_SECURITY_ENABLED:true}
+      jwt-public-key: ${SMARTPAY_GATEWAY_JWT_PUBLIC_KEY:}
+      jwt-issuer: ${SMARTPAY_GATEWAY_JWT_ISSUER:}
+      clock-skew-seconds: 30
+    cors:
+      allowed-origins:
+        - ${SMARTPAY_GATEWAY_CORS_ALLOWED_ORIGIN:http://localhost:3000}
+    routes:
+      # Downstream microservice route table (longest prefix match, path passthrough).
+      - prefix: /api/v1/payments
+        url: ${SMARTPAY_PAYMENT_SERVICE_URL:http://localhost:8082}
+      - prefix: /api/v1/invoices
+        url: ${SMARTPAY_INVOICE_SERVICE_URL:http://localhost:8083}
+      - prefix: /api/v1/epod
+        url: ${SMARTPAY_INVOICE_SERVICE_URL:http://localhost:8083}
