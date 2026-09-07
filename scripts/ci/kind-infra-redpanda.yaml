@@ -1,6 +1,7 @@
 # ==============================================================================
 # Ephemeral KinD Infrastructure: Redpanda (Single-Node Kafka Wire-Compatible Broker)
-# Pattern: Proven configuration from vrp-system
+# NOTE: Use `args` (NOT `command`) so the image /entrypoint.sh is preserved;
+# set ENABLE_DEFAULT_LISTENERS=false to pass explicit listener flags to rpk.
 # ==============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -24,17 +25,20 @@ spec:
       containers:
         - name: redpanda
           image: redpandadata/redpanda:v24.2.4
-          command:
+          env:
+            - name: ENABLE_DEFAULT_LISTENERS
+              value: "false"
+          args:
             - redpanda
             - start
             - --overprovisioned
             - --smp=1
             - --memory=512M
             - --reserve-memory=0M
-            - --node-id=0
             - --check=false
             - --kafka-addr=PLAINTEXT://0.0.0.0:9092
             - --advertise-kafka-addr=PLAINTEXT://redpanda.smartpay.svc.cluster.local:9092
+            - --default-log-level=info
           ports:
             - containerPort: 9092
           resources:
