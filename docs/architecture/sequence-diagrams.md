@@ -117,3 +117,57 @@ sequenceDiagram
     ReconSvc-->>Gateway: Reconciliation Report (e.g. 98 Matched, 2 Discrepancies)
     Gateway-->>Ops: Report displayed in dashboard
 ```
+
+---
+
+## 4. Event-Driven Multi-Channel Notification & Delivery Confirmation Flow
+
+Traces the asynchronous event-driven customer alerting lifecycle across Java 25 Virtual Threads, consumer deduplication, Resilience4j retries, and Dead Letter Queue (DLQ) poison-pill isolation:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Kafka as Redpanda / Kafka (smartpay.events.payment)
+    participant Listener as NotificationEventListener (Virtual Thread)
+    participant Idemp as NotificationIdempotencyService
+    participant Renderer as TemplateEngine
+    participant Dispatcher as NotificationDispatchService
+    participant Provider as Twilio SMS / SendGrid Email API
+    participant DB as PostgreSQL (notification.notification_logs)
+    participant DLQ as Kafka DLQ (smartpay.events.notifications.dlq)
+
+    Kafka->>Listener: Consume PaymentSettledEvent (eventId, settledAmount=£975.00)
+    Note over Listener: Offload to Java 25 Virtual Thread<br/>(Non-blocking Project Loom execution)
+
+    Listener->>Idemp: isEventProcessed(eventId, SMS)
+    Idemp->>DB: SELECT status FROM notification_logs WHERE event_id = :id AND channel = 'SMS'
+    DB-->>Idemp: Status result
+
+    alt Already Processed (Idempotency Hit - AC-2)
+        Idemp-->>Listener: true (Duplicate detected)
+        Listener->>Kafka: Commit offset (Acknowledge and suppress duplicate SMS)
+    else First-Time Processing (AC-1)
+        Idemp-->>Listener: false
+        Listener->>Renderer: render("PAYMENT_SETTLED", SMS, params)
+        Renderer-->>Listener: RenderedMessage ("SmartPay: Payout £975.00 settled to FastFreight")
+
+        Listener->>Dispatcher: dispatch(eventId, SMS, phone, message)
+        Dispatcher->>DB: INSERT INTO notification_logs (status=PENDING)
+
+        Note over Dispatcher: Wrapped in Resilience4j @Retry (maxAttempts=3, exponential backoff)
+        Dispatcher->>Provider: HTTP POST /Messages.json (Twilio REST)
+
+        alt Provider 2xx Success (HTTP 201 Created)
+            Provider-->>Dispatcher: ProviderReceipt (providerMessageId="SM-9912", status=DISPATCHED)
+            Dispatcher->>DB: UPDATE notification_logs SET status='DISPATCHED', provider_message_id='SM-9912'
+            Dispatcher-->>Listener: NotificationDispatchResult(DISPATCHED)
+            Listener->>Kafka: Commit offset (ACK)
+        else Provider Outage / 429 Rate Limit (Retries Exhausted - AC-3)
+            Provider-->>Dispatcher: HTTP 500 Internal Server Error (x3 attempts)
+            Dispatcher->>DB: UPDATE notification_logs SET status='DEAD_LETTERED', error_message='Twilio 500'
+            Dispatcher->>DLQ: Publish DeadLetterNotificationPayload (smartpay.events.notifications.dlq)
+            Dispatcher-->>Listener: NotificationDispatchResult(DEAD_LETTERED)
+            Listener->>Kafka: Commit offset (ACK - avoid poison pill consumer loop)
+        end
+    end
+```

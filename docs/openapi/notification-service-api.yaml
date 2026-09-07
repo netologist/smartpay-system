@@ -1,0 +1,228 @@
+openapi: 3.1.0
+info:
+  title: SmartPay Multi-Channel Notification Engine API
+  version: 1.0.0
+  description: Event-driven customer alerts via SMS (Twilio), Email (SendGrid), and HMAC-SHA256 signed Webhooks with consumer idempotency and Dead Letter Queues (DLQ).
+servers:
+  - url: http://localhost:8087
+    description: Local Notification Service
+  - url: http://localhost:8080/api/v1/notifications
+    description: Via API Gateway
+
+paths:
+  /api/v1/notifications/{id}:
+    get:
+      summary: Retrieve notification delivery log and audit trail by ID
+      operationId: getNotificationById
+      tags:
+        - Notifications
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique notification log identifier (UUIDv7)
+      responses:
+        '200':
+          description: Notification log retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationLogResponse'
+        '404':
+          description: Notification log not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/notifications:
+    get:
+      summary: Query notification delivery logs
+      operationId: getNotifications
+      tags:
+        - Notifications
+      parameters:
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Optional filter by originating domain event ID (e.g. PaymentSettledEvent)
+      responses:
+        '200':
+          description: List of matching notification logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationLogResponse'
+
+  /api/v1/notifications/dispatch:
+    post:
+      summary: Programmatic / manual notification dispatch trigger
+      operationId: manualDispatch
+      tags:
+        - Notifications
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualNotificationRequest'
+      responses:
+        '200':
+          description: Notification dispatched or duplicate suppressed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationLogResponse'
+        '400':
+          description: Invalid request payload or validation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Duplicate notification conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: External provider failure after retries exhausted (forwarded to DLQ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    NotificationChannel:
+      type: string
+      enum:
+        - SMS
+        - EMAIL
+        - WEBHOOK
+      description: Supported communication transport channel
+
+    NotificationStatus:
+      type: string
+      enum:
+        - PENDING
+        - DISPATCHED
+        - FAILED
+        - DEAD_LETTERED
+      description: Notification delivery lifecycle state
+
+    ManualNotificationRequest:
+      type: object
+      required:
+        - eventId
+        - eventType
+        - channel
+        - recipient
+        - templateCode
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Originating domain event ID
+        eventType:
+          type: string
+          example: PAYMENT_SETTLED
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        recipient:
+          type: string
+          example: "+447700900123"
+        templateCode:
+          type: string
+          example: PAYMENT_SETTLED
+        parameters:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            formattedAmount: "£975.00"
+            carrierName: "FastFreight Logistics"
+            bankRef: "FP-9912"
+
+    NotificationLogResponse:
+      type: object
+      required:
+        - id
+        - eventId
+        - eventType
+        - channel
+        - recipient
+        - renderedContent
+        - status
+        - retryCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        recipient:
+          type: string
+        templateCode:
+          type: string
+        renderedContent:
+          type: string
+        status:
+          $ref: '#/components/schemas/NotificationStatus'
+        providerMessageId:
+          type: string
+          nullable: true
+          example: "SM-9912"
+        retryCount:
+          type: integer
+          example: 0
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        dispatchedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - errorCode
+        - message
+        - timestamp
+      properties:
+        errorCode:
+          type: string
+          example: "ERR_VALIDATION"
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

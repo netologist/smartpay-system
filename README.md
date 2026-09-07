@@ -136,15 +136,18 @@ Comprehensive architectural specifications, design decision records, and story c
 * [**ADR-008: Event-Driven Kafka Consumer Groups for Kubernetes Concurrency**](docs/decisions/ADR-008-event-driven-worker-concurrency-in-kubernetes.md)
 * [**ADR-009: Multi-Stage Distroless Containerization with Custom JRE**](docs/decisions/ADR-009-multi-stage-distroless-containerization.md)
 * [**ADR-010: Event-Driven Multi-Channel Notifications with Consumer Idempotency and DLQ**](docs/decisions/ADR-010-event-driven-notifications-with-idempotency-and-dlq.md)
+* [**ADR-011: Automated Multi-Stage Quality Gates & Test Partitioning**](docs/decisions/ADR-011-automated-quality-gates-and-test-partitioning.md)
 
 ---
 
 ### 📑 API Specifications (OpenAPI 3.1 & Protocol Buffers)
 * 🌐 [**OpenAPI Specifications Overview**](docs/openapi/README.md)
 * 🚪 [**API Gateway Public Ingress (OpenAPI 3.1)**](docs/openapi/gateway-api.yaml)
+* 📖 [**Double-Entry General Ledger API (OpenAPI 3.1)**](docs/openapi/ledger-service-api.yaml)
 * 📄 [**Freight Invoicing & ePOD Service API (OpenAPI 3.1)**](docs/openapi/invoice-service-api.yaml)
 * 💳 [**Payment Orchestration Service API (OpenAPI 3.1)**](docs/openapi/payment-service-api.yaml)
 * 🏦 [**Bank Reconciliation Service API (OpenAPI 3.1)**](docs/openapi/recon-service-api.yaml)
+* 🔔 [**Multi-Channel Notification Engine API (OpenAPI 3.1)**](docs/openapi/notification-service-api.yaml)
 * 📦 [**Protocol Buffers Contracts (`smartpay-proto`)**](smartpay-proto/src/main/proto/) (`ledger.proto`, `payment.proto`, `risk.proto`, `common.proto`)
 
 ---

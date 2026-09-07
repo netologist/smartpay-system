@@ -1,0 +1,214 @@
+openapi: 3.1.0
+info:
+  title: SmartPay Double-Entry General Ledger API
+  version: 1.0.0
+  description: Luca Pacioli double-entry journal posting, atomic balance transfers, pessimistic balance locking, and account balance queries.
+servers:
+  - url: http://localhost:8081
+    description: Local Ledger Service
+  - url: http://localhost:8080/api/v1/ledger
+    description: Via API Gateway
+
+paths:
+  /api/v1/ledger/transfers:
+    post:
+      summary: Execute an atomic, deadlock-free double-entry transfer between two accounts
+      operationId: executeTransfer
+      tags:
+        - Ledger Transfers
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Unique client key for deduplication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '200':
+          description: Transfer executed successfully with zero-sum balanced entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+        '400':
+          description: Invalid request parameters or missing Idempotency-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Source or target account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Concurrent request conflict or idempotency clash
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Insufficient available funds or currency mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/ledger/accounts/{accountId}/balance:
+    get:
+      summary: Get cleared, hold, and available balances for an account
+      operationId: getAccountBalance
+      tags:
+        - Account Balances
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Target account identifier (UUIDv7)
+      responses:
+        '200':
+          description: Account balance details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    TransferRequest:
+      type: object
+      required:
+        - sourceAccountId
+        - targetAccountId
+        - amountInPence
+        - currency
+      properties:
+        sourceAccountId:
+          type: string
+          format: uuid
+          example: "0191c7a2-9b24-7f11-9a1c-3d842b10a512"
+        targetAccountId:
+          type: string
+          format: uuid
+          example: "0191c7a2-9b24-7f11-9a1c-3d842b10a513"
+        amountInPence:
+          type: integer
+          format: int64
+          minimum: 1
+          example: 97500
+          description: Transfer amount in minor units (e.g. pence / cents)
+        currency:
+          type: string
+          example: "GBP"
+          minLength: 3
+          maxLength: 3
+        description:
+          type: string
+          nullable: true
+          example: "Carrier factoring advance settlement"
+
+    MoneyView:
+      type: object
+      required:
+        - currency
+        - amount
+        - minorUnits
+      properties:
+        currency:
+          type: string
+          example: "GBP"
+        amount:
+          type: string
+          example: "975.00"
+        minorUnits:
+          type: integer
+          format: int64
+          example: 97500
+
+    TransferResponse:
+      type: object
+      required:
+        - transactionId
+        - status
+        - sourceAccountId
+        - targetAccountId
+        - amount
+        - sourceAvailableBalance
+        - targetAvailableBalance
+        - postedAt
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: "POSTED"
+        sourceAccountId:
+          type: string
+        targetAccountId:
+          type: string
+        amount:
+          $ref: '#/components/schemas/MoneyView'
+        sourceAvailableBalance:
+          $ref: '#/components/schemas/MoneyView'
+        targetAvailableBalance:
+          $ref: '#/components/schemas/MoneyView'
+        postedAt:
+          type: string
+          format: date-time
+
+    BalanceResponse:
+      type: object
+      required:
+        - accountId
+        - clearedBalancePence
+        - holdBalancePence
+        - availableBalancePence
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        clearedBalancePence:
+          type: integer
+          format: int64
+          example: 1000000
+        holdBalancePence:
+          type: integer
+          format: int64
+          example: 97500
+        availableBalancePence:
+          type: integer
+          format: int64
+          example: 902500
+
+    ErrorResponse:
+      type: object
+      required:
+        - errorCode
+        - message
+        - timestamp
+      properties:
+        errorCode:
+          type: string
+          example: "ERR_INSUFFICIENT_FUNDS"
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

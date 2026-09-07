@@ -54,18 +54,21 @@ C4Container
         Container(payoutWorker, "Payout Worker", "Spring Boot / Java 25", "Event-driven factoring worker consuming EpodVerifiedEvent via Kafka Consumer Groups and executing instant disbursements via Virtual Threads.")
         Container(reconService, "Reconciliation Service", "Spring Boot / Java 25", "CAMT.053 XML / MT940 bank statement ingestion and end_to_end_id ledger reconciliation.")
         Container(riskService, "Risk Service", "Spring Boot / Java 25", "Carrier and shipper credit risk scoring and fraud prevention.")
-        Container(notificationService, "Notification Service", "Spring Boot / Java 25", "Event-driven SMS / Email notification engine.")
+        Container(notificationService, "Notification Service", "Spring Boot / Java 25", "Event-driven multi-channel alert engine (Twilio SMS, SendGrid Email, signed HMAC Webhooks) with consumer idempotency and DLQ.")
     }
 
     ContainerDb(ledgerDb, "Ledger DB", "PostgreSQL 16", "accounts, account_balances, journal_transactions, journal_entries")
     ContainerDb(invoiceDb, "Invoice DB", "PostgreSQL 16", "epod_records, invoices")
-    ContainerDb(paymentDb, "Payment DB", "PostgreSQL 16", "transactional_outbox, idempotency_records")
+    ContainerDb(paymentDb, "Payment DB", "PostgreSQL 16", "transactional_outbox, idempotency_records, payments")
     ContainerDb(reconDb, "Recon DB", "PostgreSQL 16", "bank_statements, bank_statement_lines")
-    ContainerQueue(kafka, "Redpanda / Kafka", "Kafka Wire Protocol", "smartpay.events.* (epod-verified, invoice-issued, payment-settled, ledger-posted)")
-
+    ContainerDb(riskDb, "Risk DB", "PostgreSQL 16", "carrier_risk_profiles, shipper_risk_profiles, fraud_rule_evaluations")
+    ContainerDb(notificationDb, "Notification DB", "PostgreSQL 16", "notification_logs, notification_templates")
+    ContainerQueue(kafka, "Redpanda / Kafka", "Kafka Wire Protocol", "smartpay.events.* (invoice, payment, payout, dlq)")
     Rel(client, gateway, "API Requests", "HTTPS / JSON")
     Rel(gateway, invoiceService, "Invoice & ePOD calls", "HTTP / REST")
     Rel(gateway, paymentService, "Payment orders", "HTTP / REST")
+    Rel(gateway, notificationService, "Notification query & dispatch", "HTTP / REST")
+    Rel(gateway, ledgerService, "Transfer & balance queries", "HTTP / REST")
 
     Rel(invoiceService, kafka, "Publishes EpodVerifiedEvent, InvoiceIssuedEvent", "Kafka Producer")
     Rel(kafka, payoutWorker, "Consumes EpodVerifiedEvent (partitioned group)", "Kafka Consumer Group")
@@ -74,12 +77,18 @@ C4Container
     Rel(paymentService, ledgerService, "HoldFunds, TransferFunds", "gRPC over HTTP/2 (smartpay-proto)")
     Rel(paymentService, kafka, "Publishes events via Outbox Worker", "Kafka Producer")
 
+    Rel(kafka, notificationService, "Consumes PaymentSettled, InvoiceIssued, FactoringPayoutApproved", "Kafka Consumer Group")
+    Rel(notificationService, client, "Dispatches SMS, Email, Webhook alerts", "Twilio / SendGrid / HMAC-SHA256")
+    Rel(notificationService, kafka, "Publishes failed dispatches to DLQ", "Kafka Producer")
+
     Rel(reconService, ledgerService, "Verifies transaction references", "gRPC over HTTP/2")
 
     Rel(ledgerService, ledgerDb, "Read/write data (Pessimistic Lock)", "JDBC / HikariCP")
     Rel(invoiceService, invoiceDb, "Invoices and ePOD records", "JDBC / HikariCP")
     Rel(paymentService, paymentDb, "Outbox and Idempotency records", "JDBC / HikariCP")
     Rel(reconService, reconDb, "Statement lines and matching", "JDBC / HikariCP")
+    Rel(riskService, riskDb, "Risk profiles and evaluations", "JDBC / HikariCP")
+    Rel(notificationService, notificationDb, "Logs and templates", "JDBC / HikariCP")
 ```
 
 ---
@@ -112,6 +121,41 @@ C4Component
 
     Rel(ledgerEngine, txRepo, "Writes transaction header", "JPA")
     Rel(ledgerEngine, entryRepo, "Appends debit/credit lines", "JPA")
+```
+---
+
+## 🧩 Level 3: Component Diagram (Notification Service)
+
+Breaks down the internal architecture of `smartpay-notification-service`, platform's event-driven multi-channel communication engine.
+
+```mermaid
+C4Component
+    title Component Diagram - smartpay-notification-service
+
+    Container_Boundary(notifBoundary, "smartpay-notification-service") {
+        Component(eventListener, "NotificationEventListener", "Kafka Consumer", "Listens to smartpay.events.payment, invoice, payout and offloads to Virtual Threads.")
+        Component(controller, "NotificationController", "REST Controller", "Endpoints: GET /api/v1/notifications/{id}, POST /api/v1/notifications/dispatch.")
+        Component(idempService, "NotificationIdempotencyService", "Domain Service", "Prevents duplicate SMS/Email alerts upon Kafka consumer rebalance.")
+        Component(templateEngine, "TemplateEngine", "Template Renderer", "Interpolates dynamic parameters (amount, bankRef, carrierName) into template text.")
+        Component(dispatchService, "NotificationDispatchService", "Resilient Dispatcher", "Resilience4j retry with exponential backoff, circuit breaker, and DLQ routing.")
+        Component(twilioProvider, "TwilioSmsProvider", "Provider", "Dispatches SMS alerts via Twilio REST API.")
+        Component(sendGridProvider, "SendGridEmailProvider", "Provider", "Dispatches freight invoice emails via SendGrid REST API.")
+        Component(webhookProvider, "WebhookProvider", "Provider", "Dispatches signed HMAC-SHA256 HTTP POST webhooks to carriers and shippers.")
+        Component(dlqPublisher, "NotificationDlqPublisher", "Kafka Producer", "Publishes permanently failed notifications to smartpay.events.notifications.dlq.")
+        Component(logRepo, "NotificationLogRepository", "Spring Data JPA", "Manages notification_logs audit trail and delivery states.")
+        Component(templateRepo, "NotificationTemplateRepository", "Spring Data JPA", "Manages dynamic templates in notification_templates.")
+    }
+
+    Rel(eventListener, idempService, "Checks duplicate event", "Java in-process")
+    Rel(eventListener, templateEngine, "Renders template", "Java in-process")
+    Rel(eventListener, dispatchService, "Dispatches alert", "Java in-process")
+    Rel(controller, dispatchService, "Manual dispatch trigger", "Java in-process")
+    Rel(dispatchService, twilioProvider, "SMS channel", "Java in-process")
+    Rel(dispatchService, sendGridProvider, "Email channel", "Java in-process")
+    Rel(dispatchService, webhookProvider, "Webhook channel", "Java in-process")
+    Rel(dispatchService, dlqPublisher, "Forward exhausted retries", "Java in-process")
+    Rel(dispatchService, logRepo, "Persist DISPATCHED / DEAD_LETTERED", "JPA")
+    Rel(templateEngine, templateRepo, "Lookup active template", "JPA")
 ```
 
 ---

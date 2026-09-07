@@ -18,3 +18,4 @@ This directory documents the foundational technical and architectural decisions 
 | [**ADR-008**](ADR-008-event-driven-worker-concurrency-in-kubernetes.md) | Event-Driven Kafka Consumer Groups for Kubernetes Worker Concurrency | **ACCEPTED** | 2026-09-06 |
 | [**ADR-009**](ADR-009-multi-stage-distroless-containerization.md) | Multi-Stage Distroless Containerization with Custom JRE & Build Strategies | **ACCEPTED** | 2026-09-07 |
 | [**ADR-010**](ADR-010-event-driven-notifications-with-idempotency-and-dlq.md) | Event-Driven Multi-Channel Notifications with Consumer Idempotency and DLQ | **ACCEPTED** | 2026-09-07 |
+| [**ADR-011**](ADR-011-automated-quality-gates-and-test-partitioning.md) | Automated Multi-Stage Quality Gates, ArchUnit Fitness Rules & Test Partitioning | **ACCEPTED** | 2026-09-07 |
