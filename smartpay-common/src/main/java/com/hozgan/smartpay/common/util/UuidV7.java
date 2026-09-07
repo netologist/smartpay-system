@@ -1,6 +1,5 @@
 package com.hozgan.smartpay.common.util;
 
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;

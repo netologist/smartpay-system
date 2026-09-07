@@ -5,7 +5,6 @@ import com.hozgan.smartpay.common.model.id.IdempotencyKey;
 import com.hozgan.smartpay.common.model.id.TenantId;
 import com.hozgan.smartpay.payment.dto.request.PaymentRequest;
 import com.hozgan.smartpay.payment.dto.response.PaymentResponse;
-import com.hozgan.smartpay.payment.entity.TransactionalOutboxEntity;
 import com.hozgan.smartpay.payment.repository.TransactionalOutboxRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;

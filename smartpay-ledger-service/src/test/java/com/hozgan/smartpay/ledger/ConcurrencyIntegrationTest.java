@@ -10,7 +10,6 @@ import com.hozgan.smartpay.ledger.repository.AccountRepository;
 import com.hozgan.smartpay.ledger.repository.JournalEntryRepository;
 import com.hozgan.smartpay.ledger.repository.JournalTransactionRepository;
 import com.hozgan.smartpay.ledger.service.AccountBalanceService;
-import com.hozgan.smartpay.ledger.service.AccountBalanceService.TransferResult;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;

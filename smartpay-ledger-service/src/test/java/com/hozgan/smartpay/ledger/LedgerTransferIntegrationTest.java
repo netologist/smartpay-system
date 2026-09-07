@@ -9,7 +9,6 @@ import com.hozgan.smartpay.common.model.enums.JournalStatus;
 import com.hozgan.smartpay.ledger.entity.AccountBalanceEntity;
 import com.hozgan.smartpay.ledger.entity.AccountEntity;
 import com.hozgan.smartpay.ledger.entity.JournalEntryEntity;
-import com.hozgan.smartpay.ledger.entity.JournalTransactionEntity;
 import com.hozgan.smartpay.ledger.repository.AccountBalanceRepository;
 import com.hozgan.smartpay.ledger.repository.AccountRepository;
 import com.hozgan.smartpay.ledger.repository.JournalEntryRepository;

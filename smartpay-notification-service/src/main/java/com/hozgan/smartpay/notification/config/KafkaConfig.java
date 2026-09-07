@@ -34,14 +34,18 @@ import java.util.Map;
 @Configuration
 public class KafkaConfig {
 
-    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
-    private String bootstrapServers;
+    private final String bootstrapServers;
+    private final String consumerGroupId;
+    private final String dlqTopic;
 
-    @Value("${smartpay.notification.consumer-group-id:smartpay-notification-workers}")
-    private String consumerGroupId;
-
-    @Value("${smartpay.notification.topics.dlq:smartpay.events.notifications.dlq}")
-    private String dlqTopic;
+    public KafkaConfig(
+            @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
+            @Value("${smartpay.notification.consumer-group-id:smartpay-notification-workers}") String consumerGroupId,
+            @Value("${smartpay.notification.topics.dlq:smartpay.events.notifications.dlq}") String dlqTopic) {
+        this.bootstrapServers = bootstrapServers;
+        this.consumerGroupId = consumerGroupId;
+        this.dlqTopic = dlqTopic;
+    }
 
     public static ObjectMapper createObjectMapper() {
         SimpleModule module = new SimpleModule("EntityIdModule");

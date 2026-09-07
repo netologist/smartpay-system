@@ -6,7 +6,6 @@ import com.hozgan.smartpay.common.exception.InsufficientFundsException;
 import com.hozgan.smartpay.common.exception.UnbalancedJournalTransactionException;
 import com.hozgan.smartpay.common.model.Money;
 import com.hozgan.smartpay.common.model.enums.EntityType;
-import com.hozgan.smartpay.common.model.enums.EntryType;
 import com.hozgan.smartpay.common.model.enums.JournalStatus;
 import com.hozgan.smartpay.common.model.id.AccountId;
 import com.hozgan.smartpay.common.util.UuidV7;
@@ -43,7 +42,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.Currency;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 

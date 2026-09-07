@@ -4,7 +4,6 @@ import tools.jackson.databind.ObjectMapper;
 import com.hozgan.smartpay.common.exception.IdempotencyConflictException;
 import com.hozgan.smartpay.common.exception.RequestHashMismatchException;
 import com.hozgan.smartpay.common.model.id.IdempotencyKey;
-import com.hozgan.smartpay.common.model.id.TenantId;
 import com.hozgan.smartpay.payment.TestcontainersConfiguration;
 import com.hozgan.smartpay.payment.dto.request.PaymentRequest;
 import com.hozgan.smartpay.payment.dto.response.PaymentResponse;

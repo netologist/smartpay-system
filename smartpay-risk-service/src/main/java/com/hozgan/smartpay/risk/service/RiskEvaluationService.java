@@ -1,7 +1,5 @@
 package com.hozgan.smartpay.risk.service;
 
-import com.hozgan.smartpay.common.model.Money;
-import com.hozgan.smartpay.common.model.id.CarrierId;
 import com.hozgan.smartpay.common.util.UuidV7;
 import com.hozgan.smartpay.risk.entity.CarrierProfileStatus;
 import com.hozgan.smartpay.risk.entity.CarrierRiskProfileEntity;
@@ -18,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;

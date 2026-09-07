@@ -8,7 +8,6 @@ import com.hozgan.smartpay.common.model.id.TenantId;
 import com.hozgan.smartpay.gateway.entity.IdempotencyRecordEntity;
 import com.hozgan.smartpay.gateway.entity.IdempotencyRecordId;
 import com.hozgan.smartpay.gateway.repository.IdempotencyRecordRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -42,14 +41,18 @@ import java.util.Optional;
  * marker is committed and visible to concurrent requests before the downstream call begins.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class IdempotencyService {
 
     private final IdempotencyRecordRepository repository;
+    private final int ttlHours;
 
-    @Value("${smartpay.gateway.idempotency.ttl-hours:24}")
-    private int ttlHours;
+    public IdempotencyService(
+            IdempotencyRecordRepository repository,
+            @Value("${smartpay.gateway.idempotency.ttl-hours:24}") int ttlHours) {
+        this.repository = repository;
+        this.ttlHours = ttlHours;
+    }
 
     /**
      * SHA-256 hex digest of the raw request body bytes (Tier-1 tamper fingerprint).

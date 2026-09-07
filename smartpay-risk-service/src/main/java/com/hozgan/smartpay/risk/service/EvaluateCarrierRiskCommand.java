@@ -1,7 +1,6 @@
 package com.hozgan.smartpay.risk.service;
 
 import com.hozgan.smartpay.common.model.Money;
-import com.hozgan.smartpay.common.model.enums.RiskTier;
 import com.hozgan.smartpay.common.model.id.CarrierId;
 import com.hozgan.smartpay.common.model.id.ShipperId;
 

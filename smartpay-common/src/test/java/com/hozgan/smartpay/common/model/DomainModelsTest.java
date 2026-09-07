@@ -5,7 +5,6 @@ import com.hozgan.smartpay.common.converter.MoneyPenceConverter;
 import com.hozgan.smartpay.common.converter.MoneyStringConverter;
 import com.hozgan.smartpay.common.converter.TenantIdConverter;
 import com.hozgan.smartpay.common.event.EpodVerifiedEvent;
-import com.hozgan.smartpay.common.event.InvoiceIssuedEvent;
 import com.hozgan.smartpay.common.event.OutboxEvent;
 import com.hozgan.smartpay.common.exception.AccountNotFoundException;
 import com.hozgan.smartpay.common.exception.InsufficientFundsException;
@@ -22,9 +21,7 @@ import com.hozgan.smartpay.common.model.id.ShipperId;
 import com.hozgan.smartpay.common.model.id.TenantId;
 import com.hozgan.smartpay.common.event.PaymentInitiatedEvent;
 import com.hozgan.smartpay.common.model.id.EndToEndId;
-import com.hozgan.smartpay.common.model.RiskScore;
 import com.hozgan.smartpay.common.model.enums.RiskTier;
-import com.hozgan.smartpay.common.exception.RiskException;
 import com.hozgan.smartpay.common.exception.RiskEvaluationException;
 import com.hozgan.smartpay.common.exception.BlacklistedEntityException;
 import com.hozgan.smartpay.common.model.id.NotificationId;
@@ -38,7 +35,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 

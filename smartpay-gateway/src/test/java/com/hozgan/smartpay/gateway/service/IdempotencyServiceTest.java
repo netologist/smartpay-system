@@ -12,10 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,9 +34,7 @@ class IdempotencyServiceTest {
     @Mock
     private IdempotencyRecordRepository repository;
 
-    @InjectMocks
     private IdempotencyService idempotencyService;
-
     private static final TenantId TENANT = TenantId.of("TENANT-UK-01");
     private static final IdempotencyKey KEY = IdempotencyKey.of("GW-KEY-001");
     private static final IdempotencyRecordId RECORD_ID = new IdempotencyRecordId(TENANT.value(), KEY.value());
@@ -47,7 +43,7 @@ class IdempotencyServiceTest {
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(idempotencyService, "ttlHours", 24);
+        idempotencyService = new IdempotencyService(repository, 24);
     }
 
     @Test

@@ -7,7 +7,6 @@ import com.hozgan.smartpay.notification.dto.request.ManualNotificationRequest;
 import com.hozgan.smartpay.notification.entity.NotificationLogEntity;
 import com.hozgan.smartpay.notification.entity.NotificationTemplateEntity;
 import com.hozgan.smartpay.notification.model.NotificationDispatchResult;
-import com.hozgan.smartpay.notification.model.ProviderReceipt;
 import com.hozgan.smartpay.notification.model.RenderedMessage;
 import com.hozgan.smartpay.notification.provider.NotificationProvider;
 import com.hozgan.smartpay.notification.repository.NotificationLogRepository;
@@ -37,9 +36,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
