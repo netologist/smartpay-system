@@ -58,6 +58,7 @@ spec:
       containers:
         - name: postgres
           image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
               name: postgres
@@ -73,18 +74,18 @@ spec:
               cpu: 100m
               memory: 256Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 1000m
+              memory: 1024Mi
           readinessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - smartpay
-                - -d
-                - smartpay_db
-            initialDelaySeconds: 5
-            periodSeconds: 3
+                - sh
+                - -c
+                - pg_isready -h 127.0.0.1 -U smartpay -d smartpay_db || pg_isready -U smartpay -d smartpay_db
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 15
 ---
 apiVersion: v1
 kind: Service

@@ -45,7 +45,14 @@ kubectl create namespace smartpay --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f "${REPO_ROOT}/scripts/ci/kind-infra-postgres.yaml"
 echo "   Waiting for PostgreSQL to be ready..."
-kubectl wait --namespace smartpay --for=condition=available deployment/postgres --timeout=120s
+if ! kubectl wait --namespace smartpay --for=condition=available deployment/postgres --timeout=180s; then
+  echo "❌ PostgreSQL failed to become ready! Pod diagnostics:"
+  kubectl get pods -n smartpay -o wide || true
+  kubectl describe pod -l app=postgres -n smartpay || true
+  kubectl logs -l app=postgres -n smartpay --tail=100 || true
+  exit 1
+fi
+echo "   ✅ PostgreSQL is ready."
 
 kubectl apply -f "${REPO_ROOT}/scripts/ci/kind-infra-redpanda.yaml"
 echo "   Waiting for Redpanda broker to be ready..."

@@ -165,6 +165,7 @@ Comprehensive architectural specifications, design decision records, and story c
 * ✅ [**TECH-001: Containerization & K8s Kustomize Engine**](docs/stories/TECH-001-containerization-kustomize-manifests.md)
 * ✅ [**TECH-002: Enterprise CI Pipeline Automation**](docs/stories/TECH-002-ci-pipeline-automation.md)
 * ✅ [**TECH-003: KinD Cluster & E2E Testing Pipeline**](docs/stories/TECH-003-kind-e2e-testing-pipeline.md)
+* ⏳ [**TECH-004: Envoy Service Mesh & Zero-Trust mTLS**](docs/stories/TECH-004-envoy-service-mesh-mtls.md)
 
 ---
 

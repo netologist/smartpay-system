@@ -39,6 +39,7 @@ This directory contains detailed, production-ready developer story cards for bui
 | **TECH-001** | [Containerization & K8s Kustomize Engine](TECH-001-containerization-kustomize-manifests.md) | `k8s/`, `docker/` | P0 | ✅ **Completed** | Distroless Java 25 multi-stage Dockerfiles, Kustomize base & overlays (dev/staging/prod). |
 | **TECH-002** | [Enterprise CI Pipeline Automation](TECH-002-ci-pipeline-automation.md) | `.github/workflows/` | P0 | ✅ **Completed** | PR matrix validation, unit/integration partitioning, Trivy CVE scanning, GHCR publishing. |
 | **TECH-003** | [KinD Ephemeral Cluster & E2E Testing](TECH-003-kind-e2e-testing-pipeline.md) | `.github/workflows/`, `scripts/ci/` | P1 | ✅ **Completed** | Multi-node KinD cluster, PostgreSQL & Redpanda bootstrap, Kustomize deploy, automated E2E tests. |
+| **TECH-004** | [Envoy Service Mesh & Zero-Trust mTLS](TECH-004-envoy-service-mesh-mtls.md) | `k8s/mesh/`, `k8s/base/` | P1 | ⏳ **Ready to Play** | Envoy sidecar injection, SPIFFE X.509 automatic mTLS encryption, strict PeerAuthentication, L7 RBAC policies. |
 
 ---
 
@@ -134,11 +135,12 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
 | **TECH-001** | `k8s/`, `docker/` | All microservices | Kustomize / Docker | Local & Cloud Clusters | ✅ **Completed** |
 | **TECH-002** | `.github/workflows/` | Maven, Docker, Trivy | GitHub Actions | CI/CD Quality Gates | ✅ **Completed** |
 | **TECH-003** | `.github/workflows/`, `scripts/ci/` | KinD, Ingress, PostgreSQL, Redpanda | Bash / Kubectl / Helm | End-to-End Integration Suite | ✅ **Completed** |
+| **TECH-004** | `k8s/mesh/`, `k8s/base/` | Envoy / SPIFFE / cert-manager | Envoy Sidecars | Zero-Trust Cluster Security | ⏳ **Ready to Play** |
 
 ---
+
 ## 🛠️ Core Engineering Guidelines
 1. **Always Use `smartpay-common`**:
-   * Monetary amounts must use `Money`. Never use floating-point types (`double`/`float`).
    * Identifiers must use `AccountId`, `InvoiceId`, `TransactionId`, etc.
    * Domain errors must extend `SmartpayDomainException`.
 2. **Synchronous Inter-Service Calls**:
