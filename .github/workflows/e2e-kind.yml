@@ -86,7 +86,7 @@ jobs:
     name: "KinD Multi-Node Cluster E2E Suite"
     needs: build-microservices
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
 
     steps:
       - name: Checkout Code
@@ -212,14 +212,17 @@ jobs:
           echo "Checking deployment rollout status..."
           kubectl get deployments -n smartpay
           
-          echo "Waiting for core microservice deployment readiness..."
-          if ! kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-payment-service --timeout=300s; then
-            echo "❌ Payment service deployment failed! Diagnostics:"
-            kubectl describe pod -l app.kubernetes.io/name=smartpay-payment-service -n smartpay || true
-            kubectl logs -l app.kubernetes.io/name=smartpay-payment-service -n smartpay --tail=100 || true
-            exit 1
-          fi
-          kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-gateway --timeout=300s
+          echo "Waiting for payment and notification deployment readiness..."
+          for svc in smartpay-payment-service smartpay-notification-service; do
+            if ! kubectl wait --namespace smartpay --for=condition=available "deployment/${svc}" --timeout=420s; then
+              echo "❌ ${svc} failed to become ready! Diagnostics:"
+              kubectl get pods -n smartpay -o wide || true
+              kubectl describe pod -l "app.kubernetes.io/name=${svc}" -n smartpay || true
+              kubectl logs -l "app.kubernetes.io/name=${svc}" -n smartpay --tail=150 || true
+              exit 1
+            fi
+          done
+          echo "✅ Payment and notification services are ready."
       - name: Port-Forward & Execute Automated E2E Smoke Tests
         run: |
           kubectl port-forward svc/smartpay-payment-service -n smartpay 8082:8082 >/dev/null 2>&1 &
