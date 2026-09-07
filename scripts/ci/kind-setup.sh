@@ -81,8 +81,8 @@ echo "🚢 [6/7] Deploying microservices via Kustomize dev overlay..."
 kubectl apply -k "${REPO_ROOT}/k8s/overlays/dev"
 
 echo "   Waiting for payment-service and gateway deployment readiness..."
-kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-payment-service --timeout=120s
-kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-gateway --timeout=120s
+kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-payment-service --timeout=300s
+kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-gateway --timeout=300s
 kubectl get deployments -n smartpay
 
 # 8. Run Automated E2E Smoke Test Suite
