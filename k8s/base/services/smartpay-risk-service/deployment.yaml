@@ -21,8 +21,15 @@ spec:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: risk
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: ghcr.io/hozgan/smartpay/smartpay-risk-service:latest
           imagePullPolicy: IfNotPresent
           ports:
