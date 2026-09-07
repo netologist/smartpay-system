@@ -141,4 +141,26 @@ public class EntityIdJsonComponent {
             return IdempotencyKey.of(value);
         }
     }
+
+    public static class PaymentIdDeserializer extends BaseIdDeserializer<PaymentId> {
+        public PaymentIdDeserializer() {
+            super(PaymentId.class);
+        }
+
+        @Override
+        protected PaymentId _deserialize(String value, DeserializationContext ctxt) {
+            return PaymentId.of(value);
+        }
+    }
+
+    public static class NotificationIdDeserializer extends BaseIdDeserializer<NotificationId> {
+        public NotificationIdDeserializer() {
+            super(NotificationId.class);
+        }
+
+        @Override
+        protected NotificationId _deserialize(String value, DeserializationContext ctxt) {
+            return NotificationId.of(value);
+        }
+    }
 }

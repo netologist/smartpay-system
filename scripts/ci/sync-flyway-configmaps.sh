@@ -25,6 +25,7 @@ SERVICES=(
   "recon|smartpay-recon-service"
   "gateway|smartpay-gateway"
   "risk|smartpay-risk-service"
+  "notification|smartpay-notification-service"
 )
 
 for entry in "${SERVICES[@]}"; do

@@ -17,9 +17,11 @@ resources:
   - smartpay-recon-flyway-migration.yaml
   - smartpay-gateway-flyway-migration.yaml
   - smartpay-risk-flyway-migration.yaml
+  - smartpay-notification-flyway-migration.yaml
   - configmaps/smartpay-ledger-flyway-scripts.yaml
   - configmaps/smartpay-invoice-flyway-scripts.yaml
   - configmaps/smartpay-payment-flyway-scripts.yaml
   - configmaps/smartpay-recon-flyway-scripts.yaml
   - configmaps/smartpay-gateway-flyway-scripts.yaml
   - configmaps/smartpay-risk-flyway-scripts.yaml
+  - configmaps/smartpay-notification-flyway-scripts.yaml

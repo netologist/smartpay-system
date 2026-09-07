@@ -257,6 +257,16 @@ public record Money(BigDecimal amount, Currency currency) implements Comparable<
         return amount.compareTo(other.amount);
     }
 
+    public String formatted() {
+        String symbol = switch (currency.getCurrencyCode()) {
+            case "GBP" -> "£";
+            case "EUR" -> "€";
+            case "USD" -> "$";
+            default -> currency.getCurrencyCode() + " ";
+        };
+        return symbol + amount.toPlainString();
+    }
+
     @Override
     public String toString() {
         return currency.getCurrencyCode() + " " + amount.toPlainString();

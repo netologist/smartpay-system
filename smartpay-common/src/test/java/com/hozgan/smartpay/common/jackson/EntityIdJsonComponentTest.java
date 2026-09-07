@@ -29,6 +29,8 @@ class EntityIdJsonComponentTest {
         module.addDeserializer(LoadId.class, new EntityIdJsonComponent.LoadIdDeserializer());
         module.addDeserializer(TransactionId.class, new EntityIdJsonComponent.TransactionIdDeserializer());
         module.addDeserializer(IdempotencyKey.class, new EntityIdJsonComponent.IdempotencyKeyDeserializer());
+        module.addDeserializer(PaymentId.class, new EntityIdJsonComponent.PaymentIdDeserializer());
+        module.addDeserializer(NotificationId.class, new EntityIdJsonComponent.NotificationIdDeserializer());
 
         mapper = JsonMapper.builder()
                 .addModule(module)
@@ -57,5 +59,11 @@ class EntityIdJsonComponentTest {
 
         CarrierId carrierId = mapper.readValue("\"0191c7a2-9b24-7f11-9a1c-3d842b10a512\"", CarrierId.class);
         assertThat(carrierId.value()).isEqualTo(UUID.fromString("0191c7a2-9b24-7f11-9a1c-3d842b10a512"));
+
+        PaymentId paymentId = mapper.readValue("\"0191c7a2-9b24-7f11-9a1c-3d842b10a512\"", PaymentId.class);
+        assertThat(paymentId.value()).isEqualTo(UUID.fromString("0191c7a2-9b24-7f11-9a1c-3d842b10a512"));
+
+        NotificationId notificationId = mapper.readValue("\"0191c7a2-9b24-7f11-9a1c-3d842b10a512\"", NotificationId.class);
+        assertThat(notificationId.value()).isEqualTo(UUID.fromString("0191c7a2-9b24-7f11-9a1c-3d842b10a512"));
     }
 }

@@ -1,0 +1,93 @@
+server:
+  port: 8087
+  shutdown: graceful
+
+spring:
+  application:
+    name: smartpay-notification-service
+
+  threads:
+    virtual:
+      enabled: true
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:smartpay_db}?currentSchema=notification
+    username: ${DB_USER:smartpay}
+    password: ${DB_PASS:smartpay}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: notification
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    create-schemas: true
+    schemas: notification
+    default-schema: notification
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:smartpay-notification-workers}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: "*"
+
+smartpay:
+  notification:
+    consumer-group-id: smartpay-notification-workers
+    topics:
+      invoice-events: smartpay.events.invoice
+      payment-events: smartpay.events.payment
+      payout-events: smartpay.events.payout
+      dlq: smartpay.events.notifications.dlq
+    providers:
+      twilio:
+        base-url: ${TWILIO_BASE_URL:http://localhost:8089}
+        account-sid: ${TWILIO_ACCOUNT_SID:AC_MOCK_SMARTPAY}
+        auth-token: ${TWILIO_AUTH_TOKEN:mock_auth_token}
+        from-number: ${TWILIO_FROM_NUMBER:+447700900000}
+      sendgrid:
+        base-url: ${SENDGRID_BASE_URL:http://localhost:8089}
+        api-key: ${SENDGRID_API_KEY:SG.MOCK_KEY}
+        from-email: ${SENDGRID_FROM_EMAIL:notifications@smartpay.io}
+      webhook:
+        timeout-seconds: 5
+        max-retries: 3
+
+resilience4j:
+  retry:
+    instances:
+      notification-provider:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.hozgan.smartpay.notification.exception.NotificationDeliveryException
+  circuitbreaker:
+    instances:
+      notification-provider:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5000ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

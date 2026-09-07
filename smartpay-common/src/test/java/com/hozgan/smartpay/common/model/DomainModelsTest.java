@@ -27,6 +27,12 @@ import com.hozgan.smartpay.common.model.enums.RiskTier;
 import com.hozgan.smartpay.common.exception.RiskException;
 import com.hozgan.smartpay.common.exception.RiskEvaluationException;
 import com.hozgan.smartpay.common.exception.BlacklistedEntityException;
+import com.hozgan.smartpay.common.model.id.NotificationId;
+import com.hozgan.smartpay.common.model.enums.NotificationChannel;
+import com.hozgan.smartpay.common.model.enums.NotificationStatus;
+import com.hozgan.smartpay.common.event.PaymentSettledEvent;
+import com.hozgan.smartpay.common.converter.PaymentIdConverter;
+import com.hozgan.smartpay.common.converter.NotificationIdConverter;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -58,12 +64,15 @@ class DomainModelsTest {
             CarrierId carrierId = CarrierId.generate();
             InvoiceId invoiceId = InvoiceId.generate();
             PaymentId paymentId = PaymentId.generate();
+            NotificationId notificationId = NotificationId.generate();
 
             assertThat(shipperId.value().version()).isEqualTo(7);
             assertThat(carrierId.value().version()).isEqualTo(7);
             assertThat(invoiceId.value().version()).isEqualTo(7);
             assertThat(paymentId.value().version()).isEqualTo(7);
             assertThat(paymentId.asString()).isEqualTo(paymentId.value().toString());
+            assertThat(notificationId.value().version()).isEqualTo(7);
+            assertThat(notificationId.asString()).isEqualTo(notificationId.value().toString());
             assertThatThrownBy(() -> new AccountId(null))
                     .isInstanceOf(NullPointerException.class);
             assertThatThrownBy(() -> AccountId.of((String) null))
@@ -242,6 +251,16 @@ class DomainModelsTest {
             TenantId tenantId = TenantId.of("T-123");
             assertThat(tenantConverter.convertToDatabaseColumn(tenantId)).isEqualTo("T-123");
             assertThat(tenantConverter.convertToEntityAttribute("T-123")).isEqualTo(tenantId);
+
+            PaymentIdConverter paymentConverter = new PaymentIdConverter();
+            PaymentId paymentId = PaymentId.of(rawUuid);
+            assertThat(paymentConverter.convertToDatabaseColumn(paymentId)).isEqualTo(rawUuid);
+            assertThat(paymentConverter.convertToEntityAttribute(rawUuid)).isEqualTo(paymentId);
+
+            NotificationIdConverter notifConverter = new NotificationIdConverter();
+            NotificationId notifId = NotificationId.of(rawUuid);
+            assertThat(notifConverter.convertToDatabaseColumn(notifId)).isEqualTo(rawUuid);
+            assertThat(notifConverter.convertToEntityAttribute(rawUuid)).isEqualTo(notifId);
         }
     }
 
@@ -289,6 +308,34 @@ class DomainModelsTest {
             assertThat(event.aggregateId()).isEqualTo(paymentId.toString());
             assertThat(event.eventId()).isNotNull();
             assertThat(event.occurredAt()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("PaymentSettledEvent creation and domain event properties")
+        void paymentSettledEventCreation() {
+            PaymentId paymentId = PaymentId.generate();
+            CarrierId carrierId = CarrierId.generate();
+            ShipperId shipperId = ShipperId.generate();
+            Money amount = Money.ofGBP("975.00");
+
+            PaymentSettledEvent event = PaymentSettledEvent.of(
+                    paymentId, carrierId, shipperId, amount, "FP-9912", "FastFreight Logistics"
+            );
+
+            assertThat(event.eventType()).isEqualTo("PAYMENT_SETTLED");
+            assertThat(event.aggregateId()).isEqualTo(paymentId.toString());
+            assertThat(event.settledAmount()).isEqualTo(Money.ofGBP("975.00"));
+            assertThat(event.carrierName()).isEqualTo("FastFreight Logistics");
+            assertThat(event.bankReference()).isEqualTo("FP-9912");
+            assertThat(event.occurredAt()).isNotNull();
+
+            assertThat(NotificationChannel.values()).containsExactly(
+                    NotificationChannel.SMS, NotificationChannel.EMAIL, NotificationChannel.WEBHOOK
+            );
+            assertThat(NotificationStatus.values()).containsExactly(
+                    NotificationStatus.PENDING, NotificationStatus.DISPATCHED,
+                    NotificationStatus.FAILED, NotificationStatus.DEAD_LETTERED
+            );
         }
     }
 
