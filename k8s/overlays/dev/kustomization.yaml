@@ -9,7 +9,9 @@ labels:
   - pairs:
       environment: dev
 
-# In dev, scale down all deployments to 1 replica to save resources
+# In dev, scale down all deployments to 1 replica, lift CPU limits (prevents
+# cgroup throttling that stalls slow JVM startup on CI runners), and grant
+# headroom for JPA/Kafka bootstrapping.
 patches:
   - patch: |-
       apiVersion: apps/v1
@@ -18,6 +20,17 @@ patches:
         name: smartpay-gateway
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: gateway
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
     target:
       kind: Deployment
       name: smartpay-gateway
@@ -28,6 +41,17 @@ patches:
         name: smartpay-ledger-service
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: ledger
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 384Mi
     target:
       kind: Deployment
       name: smartpay-ledger-service
@@ -38,6 +62,17 @@ patches:
         name: smartpay-payment-service
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: payment
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
     target:
       kind: Deployment
       name: smartpay-payment-service
@@ -48,6 +83,17 @@ patches:
         name: smartpay-invoice-service
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: invoice
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
     target:
       kind: Deployment
       name: smartpay-invoice-service
@@ -58,6 +104,17 @@ patches:
         name: smartpay-payout-worker
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
     target:
       kind: Deployment
       name: smartpay-payout-worker
@@ -68,6 +125,17 @@ patches:
         name: smartpay-recon-service
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: recon
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
     target:
       kind: Deployment
       name: smartpay-recon-service
@@ -78,6 +146,17 @@ patches:
         name: smartpay-risk-service
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: risk
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
     target:
       kind: Deployment
       name: smartpay-risk-service
@@ -88,6 +167,17 @@ patches:
         name: smartpay-notification-service
       spec:
         replicas: 1
+        template:
+          spec:
+            containers:
+              - name: notification
+                resources:
+                  limits:
+                    cpu: null
+                    memory: 1Gi
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
     target:
       kind: Deployment
       name: smartpay-notification-service
