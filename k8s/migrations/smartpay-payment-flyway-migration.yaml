@@ -47,7 +47,7 @@ spec:
           env:
             # Shared PostgreSQL database; each service owns its own schema.
             - name: FLYWAY_URL
-              value: "jdbc:postgresql://postgres.smartpay.svc.cluster.local:5432/smartpay_db?sslmode=verify-full&sslrootcert=/etc/ssl/certs/db-ca.crt"
+              value: "jdbc:postgresql://postgres.smartpay.svc.cluster.local:5432/smartpay_db?sslmode=prefer"
             - name: FLYWAY_USER
               valueFrom:
                 secretKeyRef:

@@ -124,8 +124,10 @@ jobs:
           echo "Pre-loading infrastructure images into KinD..."
           docker pull postgres:16-alpine
           docker pull redpandadata/redpanda:v24.2.4
+          docker pull flyway/flyway:10.15.0-alpine
           kind load docker-image postgres:16-alpine --name smartpay-cluster
           kind load docker-image redpandadata/redpanda:v24.2.4 --name smartpay-cluster
+          kind load docker-image flyway/flyway:10.15.0-alpine --name smartpay-cluster
 
           SERVICES=(
             "smartpay-gateway"
@@ -190,7 +192,17 @@ jobs:
           kubectl apply -k k8s/migrations
           
           echo "Waiting for Flyway migration jobs to complete..."
-          kubectl wait --namespace smartpay --for=condition=complete job --all --timeout=120s
+          if ! kubectl wait --namespace smartpay --for=condition=complete job --all --timeout=180s; then
+            echo "❌ Flyway migration jobs timed out or failed! Diagnostics:"
+            kubectl get pods -n smartpay -o wide || true
+            kubectl describe jobs -n smartpay || true
+            for p in $(kubectl get pods -n smartpay -l app.kubernetes.io/component=db-migration -o jsonpath='{.items[*].metadata.name}'); do
+              echo "=== Pod logs for ${p} ==="
+              kubectl logs -n smartpay "${p}" || true
+            done
+            exit 1
+          fi
+          echo "✅ All Flyway migrations completed successfully."
           kubectl get jobs -n smartpay
 
       - name: Deploy Microservices via Kustomize (Dev Overlay)
@@ -201,9 +213,13 @@ jobs:
           kubectl get deployments -n smartpay
           
           echo "Waiting for core microservice deployment readiness..."
-          kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-payment-service --timeout=120s
+          if ! kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-payment-service --timeout=180s; then
+            echo "❌ Payment service deployment failed! Diagnostics:"
+            kubectl describe pod -l app.kubernetes.io/name=smartpay-payment-service -n smartpay || true
+            kubectl logs -l app.kubernetes.io/name=smartpay-payment-service -n smartpay --tail=100 || true
+            exit 1
+          fi
           kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-gateway --timeout=120s
-
       - name: Port-Forward & Execute Automated E2E Smoke Tests
         run: |
           kubectl port-forward svc/smartpay-payment-service -n smartpay 8082:8082 >/dev/null 2>&1 &
