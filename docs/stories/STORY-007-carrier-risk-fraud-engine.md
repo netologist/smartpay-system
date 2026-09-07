@@ -4,7 +4,7 @@
 * **Target Module**: `smartpay-risk-service`
 * **Priority**: P1 (Underwriting & Fraud Prevention)
 * **Domain Context**: Risk & Underwriting Bounded Context
-* **Associated Database Tables**: `carrier_risk_profiles` (`V7`), `fraud_rule_evaluations` (`V8`)
+* **Associated Database Tables**: `carrier_risk_profiles`, `shipper_risk_profiles`, `fraud_rule_evaluations` (risk schema, Flyway `V1`)
 * **Associated gRPC Dependency**: `smartpay-proto/src/main/proto/risk.proto`
 * **Consumer Service**: `smartpay-payout-worker` (`STORY-004`)
 * **Required `smartpay-common` Components**:
@@ -97,3 +97,52 @@ sequenceDiagram
 * **Given**: A carrier with credit limit £10,000 and current active factoring £9,500,
 * **When**: A new invoice of £1,000 is submitted for factoring evaluation,
 * **Then**: The evaluation rejects with `approved = false`, reasoning `EXPOSURE_CEILING_EXCEEDED`.
+
+### AC-4: Sanctioned & Blacklisted Carrier Rejection
+* **Given**: A carrier with status `SANCTIONED` or `BLACKLISTED`,
+* **When**: `EvaluateCarrierRisk` is called,
+* **Then**: The evaluation immediately halts with `approved = false`, `riskScore = 100` (Tier: `CRITICAL`), and reasoning `ERR_CARRIER_SANCTIONED_OR_BLACKLISTED`.
+
+### AC-5: Shipper-Carrier Collusion Anomaly Detection
+* **Given**: A carrier and shipper sharing the same bank account number or IP subnet (/24),
+* **When**: `EvaluateCarrierRisk` is called,
+* **Then**: The multi-factor heuristics trigger `SHIPPER_CARRIER_COLLUSION` (+50 risk points), moving the carrier to `HIGH` risk tier (`approved = false`).
+
+---
+
+## 🔌 gRPC Payload Contracts
+
+### 1. Inbound Assessment Request (`EvaluateCarrierRiskRequest`)
+```protobuf
+message EvaluateCarrierRiskRequest {
+  string carrier_id = 1;
+  string shipper_id = 2;
+  smartpay.common.MoneyProto invoice_amount = 3;
+  optional int64 invoice_created_at_epoch_ms = 4;
+  optional int64 epod_verified_at_epoch_ms = 5;
+  optional string client_ip = 6;
+  optional string bank_account_number = 7;
+}
+```
+
+### 2. Approved Assessment Response (`EvaluateCarrierRiskResponse`)
+```protobuf
+EvaluateCarrierRiskResponse {
+  carrier_id: "0191c7a2-9b24-7f11-9a1c-3d842b10a512"
+  risk_score: 18
+  risk_tier: LOW
+  approved: true
+  reasoning: "APPROVED_COMPLIANT_CARRIER"
+}
+```
+
+### 3. Fraud Anomaly Rejection Response
+```protobuf
+EvaluateCarrierRiskResponse {
+  carrier_id: "0191c7a2-9b24-7f11-9a1c-3d842b10a512"
+  risk_score: 72
+  risk_tier: CRITICAL
+  approved: false
+  reasoning: "ERR_VELOCITY_ANOMALY"
+}
+```

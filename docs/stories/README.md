@@ -13,14 +13,14 @@ This directory contains detailed, production-ready developer story cards for bui
     STORY_002[STORY-002: Invoice & ePOD Pricing Engine<br/>smartpay-invoice-service<br/><b>✅ COMPLETED</b>] --> STORY_004[STORY-004: Factoring Payout Worker<br/>smartpay-payout-worker<br/><b>✅ COMPLETED</b>]
     STORY_003 --> STORY_004
     STORY_003 --> STORY_006[STORY-006: Distributed Idempotency Gateway<br/>smartpay-gateway<br/><b>✅ COMPLETED</b>]
-    STORY_007[STORY-007: Risk & Fraud Engine<br/>smartpay-risk-service<br/><b>⏳ READY TO PLAY</b>] --> STORY_004
+    STORY_007[STORY-007: Risk & Fraud Engine<br/>smartpay-risk-service<br/><b>✅ COMPLETED</b>] --> STORY_004
     STORY_003 --> STORY_008[STORY-008: Notification Engine<br/>smartpay-notification-service<br/><b>⏳ READY TO PLAY</b>]
     classDef completed fill:#2e7d32,stroke:#1b5e20,color:#fff,stroke-width:2px;
     classDef ready fill:#1565c0,stroke:#0d47a1,color:#fff,stroke-width:2px;
     classDef blocked fill:#616161,stroke:#424242,color:#fff,stroke-width:2px;
 
-    class STORY_001,STORY_002,STORY_003,STORY_004,STORY_005,STORY_006 completed;
-    class STORY_007,STORY_008 ready;
+    class STORY_001,STORY_002,STORY_003,STORY_004,STORY_005,STORY_006,STORY_007 completed;
+    class STORY_008 ready;
 ```
 
 ---
@@ -35,7 +35,7 @@ This directory contains detailed, production-ready developer story cards for bui
 | **STORY-004** | [Carrier Factoring & Instant Payout Worker](STORY-004-payout-factoring-worker.md) | `smartpay-payout-worker` | P1 | ✅ **Completed** | Event-driven Virtual Thread worker consuming ePOD events, applying 2.5% factoring fee, and executing instant payouts via Payment gRPC. |
 | **STORY-005** | [Bank Statement & Auto-Reconciliation Engine](STORY-005-bank-reconciliation-engine.md) | `smartpay-recon-service` | P2 | ✅ **Completed** | XXE-hardened CAMT.053 ingestion, four-invariant auto-matching via `end_to_end_id` against ledger gRPC, MATCHED/DISCREPANCY transitions, line query API. |
 | **STORY-006** | [API Gateway & Distributed Idempotency Filter](STORY-006-api-gateway-idempotency.md) | `smartpay-gateway` | P2 | ✅ **Completed** | Edge RS256 JWT + tenant isolation, per-IP token bucket rate limiting, servlet two-tier SHA-256 idempotency filter (PROCESSING/COMPLETED/FAILED + TTL reclaim), reverse-proxy route table with response caching and RFC 7807 problem details. |
-| **STORY-007** | [Carrier Credit Risk & Fraud Evaluation Engine](STORY-007-carrier-risk-fraud-engine.md) | `smartpay-risk-service` | P1 | ⏳ **Ready to Play** | Carrier credit scoring, exposure limit checks, multi-factor fraud detection gRPC API. |
+| **STORY-007** | [Carrier Credit Risk & Fraud Evaluation Engine](STORY-007-carrier-risk-fraud-engine.md) | `smartpay-risk-service` | P1 | ✅ **Completed** | Carrier credit scoring, exposure ceiling enforcement, multi-factor fraud detection gRPC API over Java 25 Virtual Threads (Netty HTTP/2, schema `risk`, Flyway V1). |
 | **STORY-008** | [Event-Driven Multi-Channel Notification Engine](STORY-008-event-driven-notifications.md) | `smartpay-notification-service` | P2 | ⏳ **Ready to Play** | Consumer group processing of payment/invoice events, templated SMS/Email dispatch, idempotency, DLQ. |
 | **TECH-001** | [Containerization & K8s Kustomize Engine](TECH-001-containerization-kustomize-manifests.md) | `k8s/`, `docker/` | P0 | ⏳ **Ready to Play** | Distroless Java 25 multi-stage Dockerfiles, Kustomize base & overlays (dev/staging/prod). |
 | **TECH-002** | [Enterprise CI Pipeline Automation](TECH-002-ci-pipeline-automation.md) | `.github/workflows/` | P0 | ⏳ **Ready to Play** | PR matrix validation, unit/integration partitioning, Trivy CVE scanning, GHCR publishing. |
@@ -119,6 +119,7 @@ With `STORY-001` completed, **STORY-002** and **STORY-003** are both unblocked. 
 | **STORY-004** | `smartpay-payout-worker` | `STORY-002` (Invoices), `STORY-003` (Payments) | Kafka Events & REST/gRPC | None (Terminal consumer) | ✅ **Completed** |
 | **STORY-005** | `smartpay-recon-service` | `smartpay-common`, `STORY-001` (Journals) | gRPC `GetTransactionByReference` | External Auditor Reports | ✅ **Completed** |
 | **STORY-006** | `smartpay-gateway` | `STORY-002`, `STORY-003` (Downstream routes) | HTTP Reverse Proxy | External Web & Mobile Clients | ✅ **Completed** |
+| **STORY-007** | `smartpay-risk-service` | `smartpay-common`, `smartpay-proto` | None (gRPC Provider) | `smartpay-payout-worker` | ✅ **Completed** |
 
 ---
 

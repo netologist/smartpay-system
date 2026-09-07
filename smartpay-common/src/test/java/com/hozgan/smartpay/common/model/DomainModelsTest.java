@@ -22,6 +22,11 @@ import com.hozgan.smartpay.common.model.id.ShipperId;
 import com.hozgan.smartpay.common.model.id.TenantId;
 import com.hozgan.smartpay.common.event.PaymentInitiatedEvent;
 import com.hozgan.smartpay.common.model.id.EndToEndId;
+import com.hozgan.smartpay.common.model.RiskScore;
+import com.hozgan.smartpay.common.model.enums.RiskTier;
+import com.hozgan.smartpay.common.exception.RiskException;
+import com.hozgan.smartpay.common.exception.RiskEvaluationException;
+import com.hozgan.smartpay.common.exception.BlacklistedEntityException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -151,6 +156,42 @@ class DomainModelsTest {
             assertThat(VehicleType.fromDbCode("VAN")).isEqualTo(VehicleType.VAN);
             assertThat(VehicleType.fromDbCode("ARTIC")).isEqualTo(VehicleType.ARTIC);
         }
+
+        @Test
+        @DisplayName("RiskScore validation and RiskTier classification")
+        void riskScoreAndTierCalculations() {
+            RiskScore low = RiskScore.of(18);
+            assertThat(low.value()).isEqualTo(18);
+            assertThat(low.tier()).isEqualTo(RiskTier.LOW);
+            assertThat(low.isAcceptable()).isTrue();
+            assertThat(low.tier().isApproved()).isTrue();
+            assertThat(low.tier().advanceRate()).isEqualTo(0.975);
+
+            RiskScore medium = RiskScore.of(30);
+            assertThat(medium.tier()).isEqualTo(RiskTier.MEDIUM);
+            assertThat(medium.tier().isApproved()).isTrue();
+            assertThat(medium.tier().advanceRate()).isEqualTo(0.85);
+
+            RiskScore high = RiskScore.of(50);
+            assertThat(high.tier()).isEqualTo(RiskTier.HIGH);
+            assertThat(high.tier().isApproved()).isFalse();
+
+            RiskScore critical = RiskScore.of(85);
+            assertThat(critical.tier()).isEqualTo(RiskTier.CRITICAL);
+            assertThat(critical.tier().isApproved()).isFalse();
+            assertThat(critical.isAcceptable()).isFalse();
+
+            assertThat(RiskScore.zero().value()).isEqualTo(0);
+            assertThat(RiskScore.max().value()).isEqualTo(100);
+            assertThat(low.compareTo(critical)).isLessThan(0);
+
+            assertThatThrownBy(() -> RiskScore.of(-1))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> RiskScore.of(101))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> RiskTier.fromScore(105))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
     }
 
     @Nested
@@ -270,6 +311,23 @@ class DomainModelsTest {
 
             assertThat(category).startsWith("INSUFFICIENT_FUNDS: ");
             assertThat(ex.errorCode()).isEqualTo("ERR_INSUFFICIENT_FUNDS");
+            assertThat(ex.timestamp()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("Java 25 switch pattern matching over RiskException")
+        void riskExceptionPatternMatching() {
+            CarrierId carrierId = CarrierId.generate();
+            SmartpayDomainException ex = new BlacklistedEntityException(carrierId, "SANCTIONED");
+
+            String category = switch (ex) {
+                case BlacklistedEntityException bee -> "BLACKLISTED: " + bee.carrierId();
+                case RiskEvaluationException ree -> "EVALUATION_ERROR";
+                default -> "OTHER_ERROR";
+            };
+
+            assertThat(category).startsWith("BLACKLISTED: " + carrierId);
+            assertThat(ex.errorCode()).isEqualTo("ERR_CARRIER_SANCTIONED_OR_BLACKLISTED");
             assertThat(ex.timestamp()).isNotNull();
         }
     }

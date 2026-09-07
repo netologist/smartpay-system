@@ -1,0 +1,40 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:16-alpine:///smartpay_risk_test
+    username: test
+    password: test
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+      connection-timeout: 30000
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    create-schemas: true
+    schemas: risk
+    default-schema: risk
+    locations:
+      - classpath:db/migration
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: risk
+        format_sql: false
+
+grpc:
+  server:
+    enabled: true
+    port: 0
+
+logging:
+  level:
+    com.hozgan.smartpay.risk: DEBUG
+    org.springframework.transaction: DEBUG
+    org.flywaydb: INFO

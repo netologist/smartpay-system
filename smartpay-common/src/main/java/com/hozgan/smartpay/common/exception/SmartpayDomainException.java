@@ -15,7 +15,8 @@ public abstract sealed class SmartpayDomainException extends RuntimeException
                 LogisticsException,
                 PaymentException,
                 ReconciliationException,
-                EntityNotFoundException {
+                EntityNotFoundException,
+                RiskException {
 
     private final String errorCode;
     private final Instant timestamp;
