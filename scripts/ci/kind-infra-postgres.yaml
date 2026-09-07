@@ -1,0 +1,103 @@
+# ==============================================================================
+# Ephemeral KinD Infrastructure: PostgreSQL 16 StatefulSet & Credentials
+# Domain: Shared PostgreSQL Database for All SmartPay Microservices
+# ==============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smartpay-db-app-credentials
+  namespace: smartpay
+type: Opaque
+stringData:
+  username: smartpay
+  password: smartpay
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smartpay-db-ddl-credentials
+  namespace: smartpay
+type: Opaque
+stringData:
+  username: smartpay
+  password: smartpay
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-ca-cert
+  namespace: smartpay
+type: Opaque
+stringData:
+  db-ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIB/zCCAaSgAwIBAgIUep7mockCAQYwDQYJKoZIhvcNAQELBQAwFzEVMBMGA1UE
+    AwwMc21hcnRwYXktY2EwHhcNMjYwMTAxMDAwMDAwWhcNMzYwMTAxMDAwMDAwWjAX
+    MRUwEwYDVQQDDAxzbWFydHBheS1jYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkC
+    gYEA0Vtestcertmock==============================================
+    -----END CERTIFICATE-----
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: smartpay
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: smartpay
+            - name: POSTGRES_PASSWORD
+              value: smartpay
+            - name: POSTGRES_DB
+              value: smartpay_db
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - smartpay
+                - -d
+                - smartpay_db
+            initialDelaySeconds: 5
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: smartpay
+  labels:
+    app.kubernetes.io/name: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

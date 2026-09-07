@@ -68,6 +68,9 @@ jobs:
           kubectl kustomize k8s/base > /dev/null
 
           echo "Validating k8s/overlays/dev..."
+          echo "Validating k8s/migrations..."
+          kubectl kustomize k8s/migrations > /dev/null
+
           kubectl kustomize k8s/overlays/dev > /dev/null
 
           echo "Validating k8s/overlays/staging..."

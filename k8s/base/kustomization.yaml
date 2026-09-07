@@ -6,6 +6,7 @@ resources:
   - common-configmap.yaml
   - network-policy.yaml
   - services/smartpay-gateway/deployment.yaml
+  - services/smartpay-gateway/ingress.yaml
   - services/smartpay-ledger-service/deployment.yaml
   - services/smartpay-payment-service/deployment.yaml
   - services/smartpay-invoice-service/deployment.yaml

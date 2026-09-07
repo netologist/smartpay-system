@@ -53,3 +53,43 @@ patches:
     target:
       kind: Deployment
       name: smartpay-invoice-service
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: smartpay-payout-worker
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: smartpay-payout-worker
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: smartpay-recon-service
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: smartpay-recon-service
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: smartpay-risk-service
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: smartpay-risk-service
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: smartpay-notification-service
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: smartpay-notification-service

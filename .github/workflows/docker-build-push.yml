@@ -72,10 +72,10 @@ jobs:
         with:
           image-ref: ${{ matrix.module }}:local
           format: "table"
-          exit-code: "0" # Non-zero when critical vulnerabilities require blocking
+          exit-code: "1" # Blocks deployment on CRITICAL vulnerabilities per AC-3
           ignore-unfixed: true
           vuln-type: "os,library"
-          severity: "CRITICAL,HIGH"
+          severity: "CRITICAL"
 
       - name: Push Container Image to GHCR
         uses: docker/build-push-action@v5

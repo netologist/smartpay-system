@@ -30,3 +30,58 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: smartpay-payment-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-invoice-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-invoice-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-payout-worker-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-payout-worker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-recon-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-recon-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-risk-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-risk-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartpay-notification-pdb
+  namespace: smartpay
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smartpay-notification-service

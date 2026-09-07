@@ -6,6 +6,7 @@ on:
       - "k8s/**"
       - "docker/**"
       - "scripts/ci/**"
+      - "smartpay-**/**"
       - ".github/workflows/e2e-kind.yml"
   workflow_dispatch:
 
@@ -14,10 +15,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  kind-e2e-tests:
-    name: "KinD Multi-Node Cluster E2E Suite"
+  # ============================================================================
+  # Stage 1: Fan-Out Matrix Build (Parallel Distroless Container Image Packaging)
+  # ============================================================================
+  build-microservices:
+    name: "Build ${{ matrix.module }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - smartpay-gateway
+          - smartpay-ledger-service
+          - smartpay-payment-service
+          - smartpay-invoice-service
+          - smartpay-payout-worker
+          - smartpay-recon-service
+          - smartpay-risk-service
+          - smartpay-notification-service
 
     steps:
       - name: Checkout Code
@@ -30,6 +46,43 @@ jobs:
           java-version: "25"
           cache: "maven"
 
+      - name: Compile & Package Microservice Fat JAR
+        run: |
+          mvn clean package -pl smartpay-proto,smartpay-common,${{ matrix.module }} -am -DskipTests
+
+      - name: Build Distroless Container Image
+        run: |
+          JAR_FILE=$(find ${{ matrix.module }}/target -maxdepth 1 -name "${{ matrix.module }}-*.jar" ! -name "*sources*" ! -name "*javadoc*" | head -n 1)
+          IMAGE_TAG="ghcr.io/hozgan/smartpay/${{ matrix.module }}:latest"
+          
+          docker build \
+            -f docker/Dockerfile.prebuilt \
+            --build-arg JAR_FILE="${JAR_FILE}" \
+            -t "${IMAGE_TAG}" .
+            
+          mkdir -p /tmp/images
+          docker save "${IMAGE_TAG}" -o "/tmp/images/${{ matrix.module }}.tar"
+
+      - name: Upload Container Image Tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: "image-${{ matrix.module }}"
+          path: "/tmp/images/${{ matrix.module }}.tar"
+          retention-days: 1
+
+  # ============================================================================
+  # Stage 2: Fan-In KinD Cluster Provisioning, Deployment & E2E Test Execution
+  # ============================================================================
+  kind-e2e-suite:
+    name: "KinD Multi-Node Cluster E2E Suite"
+    needs: build-microservices
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Create KinD Cluster
         uses: helm/kind-action@v1.12.0
         with:
@@ -37,72 +90,93 @@ jobs:
           cluster_name: smartpay-cluster
           wait: 120s
 
-      - name: Verify KinD Nodes
+      - name: Verify KinD Nodes & Cluster Info
         run: |
           kubectl get nodes -o wide
           kubectl cluster-info
 
-      - name: Deploy In-Cluster PostgreSQL 16
+      - name: Download All Microservice Image Tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "image-*"
+          path: "/tmp/downloaded-images"
+          merge-multiple: true
+
+      - name: Load Container Images into KinD Cluster
+        run: |
+          SERVICES=(
+            "smartpay-gateway"
+            "smartpay-ledger-service"
+            "smartpay-payment-service"
+            "smartpay-invoice-service"
+            "smartpay-payout-worker"
+            "smartpay-recon-service"
+            "smartpay-risk-service"
+            "smartpay-notification-service"
+          )
+          
+          for svc in "${SERVICES[@]}"; do
+            echo "Loading ${svc}.tar into Docker..."
+            docker load -i "/tmp/downloaded-images/${svc}.tar"
+            
+            IMAGE_TAG="ghcr.io/hozgan/smartpay/${svc}:latest"
+            echo "Importing ${IMAGE_TAG} into KinD cluster..."
+            kind load docker-image "${IMAGE_TAG}" --name smartpay-cluster
+          done
+
+      - name: Deploy Ingress Controller (ingress-nginx for KinD)
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          echo "Waiting for ingress-nginx controller pod readiness..."
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=120s
+
+      - name: Deploy Platform Infrastructure (PostgreSQL 16 & Redpanda)
         run: |
           kubectl create namespace smartpay --dry-run=client -o yaml | kubectl apply -f -
           
-          # Create database application & DDL secrets
-          kubectl create secret generic smartpay-db-app-credentials \
-            --namespace smartpay \
-            --from-literal=username=smartpay \
-            --from-literal=password=smartpay \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-          kubectl create secret generic smartpay-db-ddl-credentials \
-            --namespace smartpay \
-            --from-literal=username=smartpay \
-            --from-literal=password=smartpay \
-            --dry-run=client -o yaml | kubectl apply -f -
-
           # Deploy PostgreSQL 16
-          kubectl run postgres --image=postgres:16-alpine \
-            --namespace smartpay \
-            --port=5432 \
-            --env="POSTGRES_USER=smartpay" \
-            --env="POSTGRES_PASSWORD=smartpay" \
-            --env="POSTGRES_DB=smartpay_db" \
-            --labels="app=postgres"
+          kubectl apply -f scripts/ci/kind-infra-postgres.yaml
+          echo "Waiting for PostgreSQL readiness..."
+          kubectl wait --namespace smartpay --for=condition=available deployment/postgres --timeout=90s
 
-          kubectl expose pod postgres --namespace smartpay --port=5432 --target-port=5432
+          # Deploy Redpanda
+          kubectl apply -f scripts/ci/kind-infra-redpanda.yaml
+          echo "Waiting for Redpanda broker readiness..."
+          kubectl wait --namespace smartpay --for=condition=available deployment/redpanda --timeout=90s
 
-          echo "Waiting for PostgreSQL to become ready..."
-          kubectl wait --namespace smartpay --for=condition=Ready pod/postgres --timeout=90s
-
-      - name: Build Local Payment & Ledger Images
+      - name: Execute Flyway Database Migrations (Sync Wave 1)
         run: |
-          echo "Building local payment service image for KinD..."
-          docker build -t ghcr.io/hozgan/smartpay/smartpay-payment-service:latest \
-            --build-arg MODULE_NAME=smartpay-payment-service \
-            -f docker/Dockerfile .
+          echo "Applying all service Flyway migrations..."
+          kubectl apply -k k8s/migrations
+          
+          echo "Waiting for Flyway migration jobs to complete..."
+          kubectl wait --namespace smartpay --for=condition=complete job --all --timeout=120s
+          kubectl get jobs -n smartpay
 
-          echo "Loading image into KinD cluster..."
-          kind load docker-image ghcr.io/hozgan/smartpay/smartpay-payment-service:latest \
-            --name smartpay-cluster
-
-      - name: Deploy Microservices via Kustomize
+      - name: Deploy Microservices via Kustomize (Dev Overlay)
         run: |
           kubectl apply -k k8s/overlays/dev
           
           echo "Checking deployment rollout status..."
           kubectl get deployments -n smartpay
+          
+          echo "Waiting for core microservice deployment readiness..."
+          kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-payment-service --timeout=120s
+          kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-gateway --timeout=120s
 
-      - name: Port-Forward & Run E2E Smoke Tests
+      - name: Port-Forward & Execute Automated E2E Smoke Tests
         run: |
-          # Forward payment-service port for E2E validation
-          kubectl port-forward svc/smartpay-payment-service -n smartpay 8082:8082 &
-          PF_PID=$!
-
-          # Allow port-forward to establish
+          kubectl port-forward svc/smartpay-payment-service -n smartpay 8082:8082 >/dev/null 2>&1 &
+          PF_PAYMENT_PID=$!
+          
+          kubectl port-forward svc/smartpay-notification-service -n smartpay 8087:8087 >/dev/null 2>&1 &
+          PF_NOTIF_PID=$!
+          
           sleep 5
-
-          # Execute automated smoke test suite
           chmod +x scripts/ci/e2e-smoke-test.sh
-          BASE_URL="http://localhost:8082" ./scripts/ci/e2e-smoke-test.sh
-
-          # Cleanup port-forward background job
-          kill -9 ${PF_PID} || true
+          BASE_URL="http://localhost:8082" NOTIFICATION_URL="http://localhost:8087" ./scripts/ci/e2e-smoke-test.sh
+          
+          kill -9 ${PF_PAYMENT_PID} ${PF_NOTIF_PID} 2>/dev/null || true

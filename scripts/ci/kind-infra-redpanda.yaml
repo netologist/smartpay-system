@@ -1,0 +1,72 @@
+# ==============================================================================
+# Ephemeral KinD Infrastructure: Redpanda (Single-Node Kafka Wire-Compatible Broker)
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redpanda
+  namespace: smartpay
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/component: message-broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redpanda
+  template:
+    metadata:
+      labels:
+        app: redpanda
+    spec:
+      containers:
+        - name: redpanda
+          image: docker.redpanda.com/redpandadata/redpanda:v24.1.8
+          command:
+            - redpanda
+            - start
+            - --overprovisioned
+            - --smp
+            - "1"
+            - --memory
+            - 512M
+            - --reserve-memory
+            - 0M
+            - --node-id
+            - "0"
+            - --check=false
+            - --kafka-addr
+            - PLAINTEXT://0.0.0.0:9092
+            - --advertise-kafka-addr
+            - PLAINTEXT://redpanda.smartpay.svc.cluster.local:9092
+          ports:
+            - name: kafka
+              containerPort: 9092
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 5
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  namespace: smartpay
+  labels:
+    app.kubernetes.io/name: redpanda
+spec:
+  type: ClusterIP
+  selector:
+    app: redpanda
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
