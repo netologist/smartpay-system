@@ -37,9 +37,10 @@ public class NotificationDlqPublisher {
             kafkaTemplate.send(dlqTopic, key, json);
             log.info("Successfully published dead-letter notification to DLQ: key={}", key);
         } catch (Exception e) {
-            log.error("Failed to publish notification to DLQ topic {}: {}", dlqTopic, e.getMessage(), e);
-            // Fallback direct send
-            kafkaTemplate.send(dlqTopic, key, payload);
+            // DLQ is best-effort: a broker outage must never fail the original dispatch
+            // request (publishToDlq is invoked from NotificationDispatchService's error path).
+            log.error("Failed to publish notification to DLQ topic {} (dispatch result preserved): {}",
+                    dlqTopic, e.getMessage(), e);
         }
     }
 }

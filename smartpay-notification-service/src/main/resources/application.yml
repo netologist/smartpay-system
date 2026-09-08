@@ -33,7 +33,7 @@ spring:
     locations: classpath:db/migration
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${REDPANDA_BOOTSTRAP_SERVERS:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:smartpay-notification-workers}
       auto-offset-reset: earliest
