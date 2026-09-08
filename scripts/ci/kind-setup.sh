@@ -72,6 +72,10 @@ echo "   Waiting for Flyway migration jobs to complete successfully..."
 kubectl wait --namespace smartpay --for=condition=complete job --all --timeout=120s
 kubectl get jobs -n smartpay
 
+# 5b. Seed Demo Ledger Accounts (E2E Smoke Fixtures)
+echo "   Seeding demo ledger accounts..."
+bash "${REPO_ROOT}/scripts/ci/seed-demo-data.sh"
+
 # 6. Build and Load Container Images into KinD
 echo "📦 [5/7] Building and loading distroless microservice images into KinD..."
 bash "${REPO_ROOT}/scripts/ci/build-and-load-kind.sh" "${CLUSTER_NAME}"

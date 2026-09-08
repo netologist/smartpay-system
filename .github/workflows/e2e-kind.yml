@@ -205,6 +205,11 @@ jobs:
           echo "✅ All Flyway migrations completed successfully."
           kubectl get jobs -n smartpay
 
+      - name: Seed Demo Ledger Accounts (Smoke Test Fixtures)
+        run: |
+          chmod +x scripts/ci/seed-demo-data.sh
+          ./scripts/ci/seed-demo-data.sh
+
       - name: Deploy Microservices via Kustomize (Dev Overlay)
         run: |
           kubectl apply -k k8s/overlays/dev
@@ -233,7 +238,27 @@ jobs:
           kubectl port-forward svc/smartpay-notification-service -n smartpay 8087:8087 >/dev/null 2>&1 &
           PF_NOTIF_PID=$!
           
-          sleep 5
+          # Port-forwards can race pod restarts after rollout; wait for the payment
+          # health endpoint to actually answer before running the suite.
+          echo "Waiting for payment-service health endpoint via port-forward..."
+          HEALTH_OK=false
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 3 "http://localhost:8082/actuator/health" 2>/dev/null | grep -q '"status":"UP"'; then
+              HEALTH_OK=true
+              break
+            fi
+            sleep 4
+          done
+          if [[ "${HEALTH_OK}" != "true" ]]; then
+            echo "❌ Payment service health never became reachable via port-forward! Diagnostics:"
+            kubectl get pods -n smartpay -o wide || true
+            kubectl describe pod -l app.kubernetes.io/name=smartpay-payment-service -n smartpay | tail -40 || true
+            kubectl logs -l app.kubernetes.io/name=smartpay-payment-service -n smartpay --tail=80 || true
+            kill -9 ${PF_PAYMENT_PID} ${PF_NOTIF_PID} 2>/dev/null || true
+            exit 1
+          fi
+          echo "✅ Payment health endpoint reachable."
+          
           chmod +x scripts/ci/e2e-smoke-test.sh
           BASE_URL="http://localhost:8082" NOTIFICATION_URL="http://localhost:8087" ./scripts/ci/e2e-smoke-test.sh
           

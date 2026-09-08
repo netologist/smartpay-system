@@ -32,14 +32,15 @@ echo "   ✅ Service health probe is healthy."
 echo "💸 [2/5] Initiating payment (AC-1: HTTP 201 Expected)..."
 PAYLOAD_ORIGINAL=$(cat <<EOF
 {
+  "tenantId": "${TENANT_ID}",
   "debtorAccountId": "0191c7a2-9b24-7f11-9a1c-3d842b10a512",
   "creditorAccountId": "0191c7a2-9b24-7f11-9a1c-3d842b10a513",
-  "amount": {
-    "amount": 975.00,
-    "currency": "GBP"
-  },
+  "amountInPence": 97500,
+  "currency": "GBP",
   "paymentMethod": "FASTER_PAYMENTS",
-  "reference": "CARRIER-PAYOUT-LD-889"
+  "reference": "CARRIER-PAYOUT-LD-889",
+  "creditorSortCode": "20-00-00",
+  "creditorAccountNumber": "12345678"
 }
 EOF
 )
@@ -82,7 +83,7 @@ echo "   ✅ AC-2 Passed: Idempotent duplicate handled cleanly."
 
 # 4. Hash Mismatch Tamper Attempt (AC-3: HTTP 422 Expected)
 echo "🛡️ [4/5] Attempting replay with altered amount (AC-3: HTTP 422 Expected)..."
-PAYLOAD_TAMPERED=$(echo "${PAYLOAD_ORIGINAL}" | sed 's/975.00/1500.00/')
+PAYLOAD_TAMPERED=$(echo "${PAYLOAD_ORIGINAL}" | sed 's/"amountInPence": 97500/"amountInPence": 150000/')
 
 RESPONSE_TAMPER=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "${BASE_URL}/api/v1/payments/initiate" \
   -H "Content-Type: application/json" \
