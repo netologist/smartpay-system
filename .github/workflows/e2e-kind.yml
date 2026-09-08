@@ -212,17 +212,19 @@ jobs:
           echo "Checking deployment rollout status..."
           kubectl get deployments -n smartpay
           
-          echo "Waiting for payment and notification deployment readiness..."
-          for svc in smartpay-payment-service smartpay-notification-service; do
-            if ! kubectl wait --namespace smartpay --for=condition=available "deployment/${svc}" --timeout=420s; then
-              echo "❌ ${svc} failed to become ready! Diagnostics:"
-              kubectl get pods -n smartpay -o wide || true
-              kubectl describe pod -l "app.kubernetes.io/name=${svc}" -n smartpay || true
-              kubectl logs -l "app.kubernetes.io/name=${svc}" -n smartpay --tail=150 || true
-              exit 1
-            fi
-          done
-          echo "✅ Payment and notification services are ready."
+          echo "Waiting for all application deployments to become ready..."
+          if ! kubectl wait --namespace smartpay --for=condition=available deployment --all --timeout=480s; then
+            echo "❌ One or more deployments failed to become ready! Diagnostics:"
+            kubectl get pods -n smartpay -o wide || true
+            for pod in $(kubectl get pods -n smartpay -o jsonpath='{.items[?(@.status.containerStatuses[0].ready==false)].metadata.name}' 2>/dev/null); do
+              echo "=== Pod: ${pod} ==="
+              kubectl describe pod "${pod}" -n smartpay | grep -A 8 "State:\|Reason:\|Last State:" || true
+              kubectl logs "${pod}" -n smartpay --tail=80 || true
+            done
+            exit 1
+          fi
+          echo "✅ All application services are ready."
+          kubectl get deployments -n smartpay
       - name: Port-Forward & Execute Automated E2E Smoke Tests
         run: |
           kubectl port-forward svc/smartpay-payment-service -n smartpay 8082:8082 >/dev/null 2>&1 &
