@@ -24,6 +24,9 @@ patches:
           spec:
             containers:
               - name: gateway
+                env:
+                  - name: SMARTPAY_GATEWAY_SECURITY_ENABLED
+                    value: "false"
                 resources:
                   limits:
                     cpu: null
