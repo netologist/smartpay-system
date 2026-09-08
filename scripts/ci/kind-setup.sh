@@ -89,22 +89,34 @@ kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-
 kubectl wait --namespace smartpay --for=condition=available deployment/smartpay-gateway --timeout=300s
 kubectl get deployments -n smartpay
 
-# 8. Run Automated E2E Smoke Test Suite
-echo "🧪 [7/7] Executing automated E2E smoke tests..."
-kubectl port-forward svc/smartpay-payment-service -n smartpay 8082:8082 >/dev/null 2>&1 &
-PF_PAYMENT_PID=$!
-
-kubectl port-forward svc/smartpay-notification-service -n smartpay 8087:8087 >/dev/null 2>&1 &
-PF_NOTIF_PID=$!
+# 8. Run Automated E2E Smoke Test Suite (through the edge gateway only)
+echo "🧪 [7/7] Executing automated E2E smoke tests via gateway..."
+kubectl port-forward svc/smartpay-gateway -n smartpay 8080:8080 >/dev/null 2>&1 &
+PF_GATEWAY_PID=$!
 
 cleanup() {
-  kill -9 "${PF_PAYMENT_PID}" "${PF_NOTIF_PID}" 2>/dev/null || true
+  kill -9 "${PF_GATEWAY_PID}" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-sleep 5
+echo "   Waiting for gateway health endpoint..."
+HEALTH_OK=false
+for i in $(seq 1 30); do
+  if curl -sf --max-time 3 "http://localhost:8080/actuator/health" 2>/dev/null | grep -q '"status":"UP"'; then
+    HEALTH_OK=true
+    break
+  fi
+  sleep 4
+done
+if [[ "${HEALTH_OK}" != "true" ]]; then
+  echo "❌ Gateway health never became reachable via port-forward!"
+  kubectl get pods -n smartpay -o wide || true
+  kubectl logs -l app.kubernetes.io/name=smartpay-gateway -n smartpay --tail=80 || true
+  exit 1
+fi
+
 chmod +x "${REPO_ROOT}/scripts/ci/e2e-smoke-test.sh"
-BASE_URL="http://localhost:8082" NOTIFICATION_URL="http://localhost:8087" "${REPO_ROOT}/scripts/ci/e2e-smoke-test.sh"
+GATEWAY_URL="http://localhost:8080" "${REPO_ROOT}/scripts/ci/e2e-smoke-test.sh"
 
 echo "============================================================"
 echo "🎉 KIND E2E DEPLOYMENT & TESTING COMPLETED SUCCESSFULLY!"

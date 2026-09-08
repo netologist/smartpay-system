@@ -39,6 +39,14 @@ spec:
             - configMapRef:
                 name: smartpay-common-config
           env:
+            - name: SMARTPAY_PAYMENT_SERVICE_URL
+              value: "http://smartpay-payment-service:8082"
+            - name: SMARTPAY_INVOICE_SERVICE_URL
+              value: "http://smartpay-invoice-service:8083"
+            - name: SMARTPAY_NOTIFICATION_SERVICE_URL
+              value: "http://smartpay-notification-service:8087"
+            - name: SMARTPAY_RECON_SERVICE_URL
+              value: "http://smartpay-recon-service:8085"
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://postgres.smartpay.svc.cluster.local:5432/smartpay_db"
             - name: SPRING_DATASOURCE_USERNAME

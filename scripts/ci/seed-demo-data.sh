@@ -14,7 +14,7 @@ DB_NAME="${DB_NAME:-smartpay_db}"
 
 echo "Seeding demo ledger accounts for E2E smoke tests..."
 
-kubectl exec -n "${NAMESPACE}" deployment/postgres -- psql -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 <<'SQL'
+kubectl exec -i -n "${NAMESPACE}" deployment/postgres -- psql -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 <<'SQL'
 -- Debtor account used by e2e-smoke-test.sh (AC-1 happy path hold)
 INSERT INTO ledger.accounts (id, account_number, entity_id, entity_type, currency)
 VALUES ('0191c7a2-9b24-7f11-9a1c-3d842b10a512', 'ACC-SMOKE-512', '0191c7a2-9b24-7f11-9a1c-3d842b10a512', 'CARRIER', 'GBP')

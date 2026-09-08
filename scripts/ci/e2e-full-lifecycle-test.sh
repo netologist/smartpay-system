@@ -17,12 +17,15 @@
 
 set -euo pipefail
 
+# Business APIs are reachable ONLY through the edge gateway.
 GATEWAY_URL="${GATEWAY_URL:-http://localhost:8080}"
-PAYMENT_URL="${PAYMENT_URL:-http://localhost:8082}"
-INVOICE_URL="${INVOICE_URL:-http://localhost:8083}"
+
+# Internal actuator probes (allowed via port-forward / in-cluster only; never public).
+PAYMENT_URL="${PAYMENT_URL:-${GATEWAY_URL}}"
+INVOICE_URL="${INVOICE_URL:-${GATEWAY_URL}}"
 LEDGER_URL="${LEDGER_URL:-http://localhost:8081}"
-NOTIF_URL="${NOTIF_URL:-http://localhost:8087}"
-RECON_URL="${RECON_URL:-http://localhost:8085}"
+NOTIF_URL="${NOTIF_URL:-${GATEWAY_URL}}"
+RECON_URL="${RECON_URL:-${GATEWAY_URL}}"
 
 RUN_ID="$(date +%s)"
 TENANT_ID="TENANT-UK-${RUN_ID: -4}"
@@ -79,6 +82,7 @@ EPOD_PAYLOAD=$(cat <<EOF
   "deliveredAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "latitude": 51.5074,
   "longitude": -0.1278,
+  "photoS3Url": "s3://smartpay-epod/${LOAD_ID}.jpg",
   "signatureHash": "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0"
 }
 EOF
@@ -87,6 +91,7 @@ EOF
 echo "   Submitting electronic Proof of Delivery (ePOD)..."
 EPOD_RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "${INVOICE_URL}/api/v1/epod/verify" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: EPOD-${IDEMPOTENCY_KEY}" \
   -d "${EPOD_PAYLOAD}" || true)
 
 HTTP_CODE=$(echo "${EPOD_RESP}" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -97,9 +102,8 @@ INVOICE_PAYLOAD=$(cat <<EOF
   "loadId": "${LOAD_ID}",
   "shipperId": "${SHIPPER_ID}",
   "carrierId": "${CARRIER_ID}",
-  "baseAmount": 100000,
-  "fuelSurcharge": 10000,
-  "vatAmount": 22000,
+  "vehicleType": "ARTIC",
+  "mileageMiles": 132.5,
   "currency": "GBP"
 }
 EOF
@@ -108,6 +112,7 @@ EOF
 echo "   Generating Freight Invoice with Itemized Pricing..."
 INVOICE_RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "${INVOICE_URL}/api/v1/invoices" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: INV-${IDEMPOTENCY_KEY}" \
   -d "${INVOICE_PAYLOAD}" || true)
 
 HTTP_CODE=$(echo "${INVOICE_RESP}" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -135,14 +140,15 @@ CREDITOR_ACC="0191c7a2-9b24-7f11-9a1c-3d842b10a513"
 
 PAYMENT_PAYLOAD=$(cat <<EOF
 {
+  "tenantId": "${TENANT_ID}",
   "debtorAccountId": "${DEBTOR_ACC}",
   "creditorAccountId": "${CREDITOR_ACC}",
-  "amount": {
-    "amount": 975.00,
-    "currency": "GBP"
-  },
+  "amountInPence": 97500,
+  "currency": "GBP",
   "paymentMethod": "FASTER_PAYMENTS",
-  "reference": "${BANK_REF}"
+  "reference": "${BANK_REF}",
+  "creditorSortCode": "20-00-00",
+  "creditorAccountNumber": "12345678"
 }
 EOF
 )
@@ -185,7 +191,7 @@ fi
 echo "   ✅ Cache Hit: Replay response returned with zero double-charge."
 
 echo "   2. Replaying with altered amount (£1,500.00) -> HTTP 422 Expected..."
-TAMPER_PAYLOAD=$(echo "${PAYMENT_PAYLOAD}" | sed 's/975.00/1500.00/')
+TAMPER_PAYLOAD=$(echo "${PAYMENT_PAYLOAD}" | sed 's/"amountInPence": 97500/"amountInPence": 150000/')
 TAMPER_RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "${PAYMENT_URL}/api/v1/payments/initiate" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: ${IDEMPOTENCY_KEY}" \
@@ -236,6 +242,7 @@ EOF
 echo "   Triggering customer notification dispatch via REST..."
 NOTIF_RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "${NOTIF_URL}/api/v1/notifications/dispatch" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: NOTIF-${NOTIF_EVENT_ID}" \
   -d "${NOTIF_DISPATCH_REQ}")
 
 HTTP_CODE=$(echo "${NOTIF_RESP}" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -256,6 +263,7 @@ echo "   Audit Record: ${AUDIT_RESP}"
 echo "   Verifying notification consumer idempotency (AC-2)..."
 DUP_NOTIF_RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "${NOTIF_URL}/api/v1/notifications/dispatch" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: NOTIF-${NOTIF_EVENT_ID}" \
   -d "${NOTIF_DISPATCH_REQ}")
 DUP_NOTIF_CODE=$(echo "${DUP_NOTIF_RESP}" | grep "HTTP_CODE:" | cut -d':' -f2)
 echo "   Duplicate Dispatch Response Code: ${DUP_NOTIF_CODE}"
@@ -312,6 +320,7 @@ echo "${CAMT053_XML}" > "${TMP_CAMT_FILE}"
 
 echo "   Uploading ISO 20022 CAMT.053 XML statement for settlement ${BANK_REF}..."
 RECON_RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "${RECON_URL}/api/v1/recon/statements/upload" \
+  -H "Idempotency-Key: RECON-${BANK_REF}" \
   -F "file=@${TMP_CAMT_FILE}" || true)
 rm -f "${TMP_CAMT_FILE}"
 

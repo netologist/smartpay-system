@@ -61,9 +61,15 @@ smartpay:
         - ${SMARTPAY_GATEWAY_CORS_ALLOWED_ORIGIN:http://localhost:3000}
     routes:
       # Downstream microservice route table (longest prefix match, path passthrough).
+      # All external traffic must enter through this gateway; services never expose
+      # themselves to the public network.
       - prefix: /api/v1/payments
         url: ${SMARTPAY_PAYMENT_SERVICE_URL:http://localhost:8082}
       - prefix: /api/v1/invoices
         url: ${SMARTPAY_INVOICE_SERVICE_URL:http://localhost:8083}
       - prefix: /api/v1/epod
         url: ${SMARTPAY_INVOICE_SERVICE_URL:http://localhost:8083}
+      - prefix: /api/v1/notifications
+        url: ${SMARTPAY_NOTIFICATION_SERVICE_URL:http://localhost:8087}
+      - prefix: /api/v1/recon
+        url: ${SMARTPAY_RECON_SERVICE_URL:http://localhost:8085}
