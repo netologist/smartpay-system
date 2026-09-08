@@ -75,16 +75,17 @@ flowchart TD
         Redpanda{{"🐼 Redpanda / Kafka (Port 9092)<br/>• smartpay.events.invoice<br/>• smartpay.events.factoring<br/>• smartpay.events.payment"}}
     end
 
-    %% External Connections
+    %% External Connections — every external request enters via the gateway only
     Shipper -->|HTTPS REST| Gateway
     Carrier -->|HTTPS REST / ePOD| Gateway
-    Bank -->|Bank Statements / Payout Clearance| ReconSvc
-    Auditor -->|Audit Reports| ReconSvc
+    Bank -->|Bank Statements / Payout Clearance| Gateway
+    Auditor -->|Audit / Recon Reports| Gateway
 
-    %% Gateway Routing
-    Gateway -->|REST Route| InvoiceSvc
-    Gateway -->|REST Route| PaymentSvc
-    Gateway -->|REST Route| LedgerSvc
+    %% Gateway Routing (sole public entry; path passthrough)
+    Gateway -->|"/api/v1/invoices, /api/v1/epod"| InvoiceSvc
+    Gateway -->|"/api/v1/payments"| PaymentSvc
+    Gateway -->|"/api/v1/notifications"| NotificationSvc
+    Gateway -->|"/api/v1/recon"| ReconSvc
 
     %% Core Service Interactions
     InvoiceSvc -->|Publish EpodVerifiedEvent| Redpanda
@@ -173,6 +174,7 @@ Comprehensive architectural specifications, design decision records, and story c
 * 🏛️ [**Agent & Architectural Coding Standards**](AGENTS.md)
 * ⚠️ [**TD-001: Currency Master Definitions Table**](docs/tech-debt/TD-001-currency-definitions-master-table.md)
 * ⚠️ [**TD-002: Test Directory Physical Partitioning**](docs/tech-debt/TD-002-test-directory-physical-partitioning.md)
+* ⚠️ [**TD-003: Wire Money as `amount` + `currency` Object (not pence)**](docs/tech-debt/TD-003-money-amount-currency-dto.md)
 
 ---
 
@@ -180,7 +182,7 @@ Comprehensive architectural specifications, design decision records, and story c
 
 | Service | Module | HTTP Port | gRPC Port | Database (Schema) | Primary Responsibility |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **API Gateway** | `smartpay-gateway` | `8080` | — | `smartpay_db` (`gateway`) | Reverse proxy, JWT auth, rate limiting, two-tier SHA-256 idempotency filter |
+| **API Gateway** | `smartpay-gateway` | `8080` | — | `smartpay_db` (`gateway`) | **Sole public entry**. Reverse proxy, JWT auth, rate limiting, two-tier SHA-256 idempotency. Routes (`path passthrough`): `/api/v1/payments`, `/api/v1/invoices`, `/api/v1/epod`, `/api/v1/notifications`, `/api/v1/recon`. Downstream targets injected in-cluster via `SMARTPAY_PAYMENT_SERVICE_URL`, `SMARTPAY_INVOICE_SERVICE_URL`, `SMARTPAY_NOTIFICATION_SERVICE_URL`, `SMARTPAY_RECON_SERVICE_URL` |
 | **Ledger Service** | `smartpay-ledger-service` | `8081` | `9091` | `smartpay_db` (`ledger`) | Double-entry journal posting, balance transfers, hold/release lifecycle |
 | **Payment Service** | `smartpay-payment-service` | `8082` | `9092` | `smartpay_db` (`payment`) | Faster Payments / VRP orchestration, Transactional Outbox (`SKIP LOCKED`) |
 | **Invoice Service** | `smartpay-invoice-service` | `8083` | `9093` | `smartpay_db` (`invoice`) | ePOD signature verification, freight pricing (base + fuel + VAT) |
@@ -191,6 +193,12 @@ Comprehensive architectural specifications, design decision records, and story c
 | **PostgreSQL 16** | `postgres` | `5432` | — | `smartpay_db` | Shared ACID database; each service owns an isolated PostgreSQL schema (`ledger`, `invoice`, `payment`, `recon`, …) with B-Tree UUIDv7 indexes |
 | **Redpanda Broker** | `redpanda` | `9092` | — | — | Lightweight C++20 event streaming broker (Kafka wire-compatible) |
 | **Redpanda Console**| `redpanda-console` | `8090` | — | — | Topic and message monitoring dashboard (`http://localhost:8090`) |
+
+> **Public network access**: only `smartpay-gateway` (and ops tooling such as
+> PostgreSQL/Redpanda in dev) is reachable externally. All business microservices
+> are ClusterIP-only and communicate in-cluster via gRPC or Redpanda events;
+> their HTTP ports above are internal service ports, never public.
+
 
 ---
 
@@ -271,11 +279,12 @@ mvn test -Pintegration
 SmartPay provides automated one-command provisioning and verification for local Kubernetes testing:
 
 #### ☸️ One-Command KinD Setup & E2E Runner (`scripts/ci/kind-setup.sh`)
-Provisions a 3-node KinD cluster (1 control-plane, 2 workers with port mappings `80/443`), installs NGINX Ingress controller, deploys PostgreSQL 16 & Redpanda, applies Flyway migrations, builds/loads distroless container images, rolls out microservices via Kustomize dev overlay, and executes automated E2E tests:
+Provisions a 3-node KinD cluster (1 control-plane, 2 workers with port mappings `80/443`), installs NGINX Ingress controller, deploys PostgreSQL 16 & Redpanda, applies Flyway migrations, seeds the demo ledger accounts, builds/loads distroless container images, rolls out microservices via Kustomize dev overlay, and executes the automated gateway-mediated E2E smoke suite:
 ```bash
 chmod +x scripts/ci/kind-setup.sh
 ./scripts/ci/kind-setup.sh smartpay-cluster
 ```
+The smoke suite (`e2e-smoke-test.sh`) and the full-lifecycle suite reach the platform **only through the gateway** (`GATEWAY_URL`, default `http://localhost:8080`); no business service port is called directly. Demo ledger accounts used by the suites are seeded by `scripts/ci/seed-demo-data.sh`.
 
 #### 🧪 Full 10-Phase E2E Lifecycle Journey (`scripts/ci/e2e-full-lifecycle-test.sh`)
 Executes all 10 stages of the end-to-end commercial freight payment lifecycle:
@@ -305,7 +314,10 @@ chmod +x scripts/ci/inspect-kafka-topics.sh
 ---
 
 ### 6. Running Microservices Locally
-Services can be launched independently using the Spring Boot Maven plugin:
+Services can be launched independently using the Spring Boot Maven plugin. In production-like
+topologies every external request must go through the API Gateway — business services are
+ClusterIP-only. For local runs, either call the gateway last and point it at the other services,
+or invoke a service directly only for development:
 
 ```bash
 # 1. Start Ledger Service (HTTP: 8081, gRPC: 9091)
@@ -314,21 +326,30 @@ mvn spring-boot:run -pl smartpay-ledger-service
 # 2. Start Payment Service (HTTP: 8082, gRPC: 9092)
 mvn spring-boot:run -pl smartpay-payment-service
 
-# 3. Start Invoice & ePOD Service (HTTP: 8083, gRPC: 9093)
+# 3. Start Invoice & ePOD Service (HTTP: 8083)
 mvn spring-boot:run -pl smartpay-invoice-service
 
 # 4. Start Payout Factoring Worker (HTTP: 8084)
 mvn spring-boot:run -pl smartpay-payout-worker
 
-# 5. Start Bank Reconciliation Service (HTTP: 8085, gRPC: 9094)
+# 5. Start Bank Reconciliation Service (HTTP: 8085)
 mvn spring-boot:run -pl smartpay-recon-service
 
-# 6. Start Risk & Fraud Service (HTTP: 8086, gRPC: 9095)
+# 6. Start Risk & Fraud Service (HTTP: 8086, gRPC: 9091)
 mvn spring-boot:run -pl smartpay-risk-service
 
 # 7. Start Notification Service (HTTP: 8087)
 mvn spring-boot:run -pl smartpay-notification-service
 
-# 8. Start API Gateway Ingress (HTTP: 8080)
+# 8. Start API Gateway — the ONLY public entry point. Point its downstream
+#    routes at the locally running services (defaults are localhost:8082/8083/8087/8085):
+SMARTPAY_PAYMENT_SERVICE_URL=http://localhost:8082 \
+SMARTPAY_INVOICE_SERVICE_URL=http://localhost:8083 \
+SMARTPAY_NOTIFICATION_SERVICE_URL=http://localhost:8087 \
+SMARTPAY_RECON_SERVICE_URL=http://localhost:8085 \
+SMARTPAY_GATEWAY_SECURITY_ENABLED=false \
 mvn spring-boot:run -pl smartpay-gateway
 ```
+Route through the gateway for business calls, e.g. `POST http://localhost:8080/api/v1/payments/initiate`
+with an `Idempotency-Key` and `X-Tenant-Id` header. The notification service additionally needs a
+reachable `REDPANDA_BOOTSTRAP_SERVERS` broker (its dead-letter producer publishes there).

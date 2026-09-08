@@ -49,6 +49,30 @@ paths:
         '201':
           $ref: 'payment-service-api.yaml#/paths/~1api~1v1~1payments~1initiate/post/responses/201'
 
+  /api/v1/notifications/dispatch:
+    post:
+      summary: Proxy to Notification Service - Manual Multi-Channel Dispatch
+      tags: [Notifications & Events]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        $ref: 'notification-service-api.yaml#/paths/~1api~1v1~1notifications~1dispatch/post/requestBody'
+      responses:
+        '200':
+          $ref: 'notification-service-api.yaml#/paths/~1api~1v1~1notifications~1dispatch/post/responses/200'
+
+  /api/v1/recon/statements/upload:
+    post:
+      summary: Proxy to Reconciliation Service - Upload CAMT.053 Bank Statement
+      tags: [Bank Reconciliation]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        $ref: 'recon-service-api.yaml#/paths/~1api~1v1~1recon~1statements~1upload/post/requestBody'
+      responses:
+        '201':
+          $ref: 'recon-service-api.yaml#/paths/~1api~1v1~1recon~1statements~1upload/post/responses/201'
+
 components:
   securitySchemes:
     BearerAuth:

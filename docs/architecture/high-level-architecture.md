@@ -39,12 +39,23 @@ graph TD
     PayoutBC -->|gRPC: InitiatePayment| PaymentBC
     PaymentBC -->|gRPC: HoldFunds, TransferFunds| LedgerBC
     ReconBC -->|gRPC: VerifyReference| LedgerBC
-    GatewayBC -->|REST| InvoiceBC
-    GatewayBC -->|REST| PaymentBC
+    GatewayBC -->|REST: /api/v1/epod, /api/v1/invoices| InvoiceBC
+    GatewayBC -->|REST: /api/v1/payments| PaymentBC
+    GatewayBC -->|REST: /api/v1/notifications| NotificationBC
+    GatewayBC -->|REST: /api/v1/recon| ReconBC
     InvoiceBC -->|Kafka: InvoiceIssuedEvent| NotificationBC
     PaymentBC -->|Kafka: PaymentSettledEvent| NotificationBC
     PayoutBC -->|Kafka: FactoringPayoutApprovedEvent| NotificationBC
 ```
+
+> **Public entry rule**: every external request enters exclusively through the API
+> Gateway (`smartpay-gateway`, port 8080). No business microservice is reachable
+> from outside the cluster — the gateway routes by longest-prefix match to
+> `/api/v1/payments`, `/api/v1/invoices`, `/api/v1/epod`,
+> `/api/v1/notifications`, and `/api/v1/recon` (path passthrough). Services
+> communicate with each other only in-cluster (gRPC for synchronous financial
+> RPC, Redpanda/Kafka for events); gateway downstream targets are injected via
+> `SMARTPAY_{PAYMENT,INVOICE,NOTIFICATION,RECON}_SERVICE_URL`.
 
 ### Context Definitions
 1. **Ledger Context (`smartpay-ledger-service`)**:
@@ -77,37 +88,43 @@ The platform employs a hybrid communication strategy:
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                             Clients (Web / Mobile)                              │
 └────────────────────────────────────────┬────────────────────────────────────────┘
-                                         │ HTTPS / JSON REST
+                                         │ HTTPS / JSON REST (gateway ONLY)
 ┌────────────────────────────────────────▼────────────────────────────────────────┐
-│                                   API Gateway                                   │
-└───────────────────┬─────────────────────────────────────────────┬───────────────┘
-                    │ HTTP REST                                   │ HTTP REST
-┌───────────────────▼─────────────┐             ┌─────────────────▼───────────────┐
-│         Invoice Service         │             │         Payment Service         │
-└───────────────────┬─────────────┘             └─────────┬───────────────┬───────┘
-                    │ Outbox Event                        │               │ gRPC HTTP/2
-                    │ (EpodVerifiedEvent)                 │ Outbox Event  │ (HoldFunds,
-                    ▼                                     │ (Payment-     │  ReleaseHold)
-┌─────────────────────────────────────────────────────────┼───────┐       ▼
-│              Redpanda / Kafka Event Stream              │       │ ┌─────────────┐
-│       (smartpay.events.{invoice, payment, payout})      │       │ │LedgerService│
-└───────────────┬─────────────────────────────────┬───────┘       │ └─────────────┘
-                │ Partitioned Group               │               │
-                │ smartpay-factoring-workers      │               ▼
-┌───────────────▼───────────────┐                 │ (PaymentSettledEvent)
-│    Payout Worker (K8s Pods)   │                 │
-└───────┬───────────────┬───────┘                 │ Consumer Group:
-        │               │                         │ smartpay-notification-workers
-        │ gRPC HTTP/2   │ gRPC HTTP/2             ▼
-        │ (EvaluateRisk)│ (InitiatePayment) ┌─────────────────────────────────────┐
-        ▼               ▼                   │     Notification Service (Pods)     │
-┌───────────────┐┌───────────────┐          └──────────────────┬──────────────────┘
-│  Risk Service ││Payment Service│                             │ SMS / Email / Webhook
-└───────────────┘└───────────────┘                             ▼
-                                           ┌─────────────────────────────────────┐
-                                           │  External Providers: Twilio/SendGrid│
-                                           └─────────────────────────────────────┘
+│                        API Gateway (smartpay-gateway :8080)                     │
+│   routes: /api/v1/payments · /api/v1/invoices · /api/v1/epod                    │
+│           /api/v1/notifications · /api/v1/recon                                 │
+└───┬───────────────┬───────────────┬───────────────┬─────────────────────────────┘
+    │ HTTP REST     │ HTTP REST     │ HTTP REST     │ HTTP REST
+┌───▼─────────┐ ┌───▼────────────┐ ┌▼─────────────┐ ┌▼───────────────┐
+│ Invoice Svc │ │ Payment Svc    │ │Notification  │ │ Recon Svc      │
+└───┬─────────┘ └───┬────────────┘ └───┬──────────┘ └────────────────┘
+    │ Outbox Event  │                  │ (in-cluster, no public port)
+    │ (EpodVerified)│ Outbox Event     │
+    ▼               ▼                  │
+┌──────────────────────────────────────┼─────────────────────────────┐
+│   Redpanda / Kafka Event Stream      │                             │
+│   (smartpay.events.{invoice,payment, │                             │
+│    payout, factoring})               │                             │
+└───────────────┬────────────────┬─────┘                             │
+                │                │ (PaymentSettledEvent)             │ gRPC HTTP/2
+                │ smartpay-factoring-workers                        │ (HoldFunds, …)
+┌───────────────▼──────────────┐ │ smartpay-notification-workers    ▼
+│      Payout Worker (Pods)    │ └──────────────► Notification svc ┌──────────────┐
+└───────┬──────────────┬───────┘                  (async events,   │Ledger Service│
+        │ gRPC HTTP/2  │ gRPC HTTP/2              DLQ → Redpanda)  └──────────────┘
+        ▼              ▼                                        ▲
+┌──────────────┐ ┌──────────────┐  Notification → SMS/Email/Webhook  │ gRPC
+│ Risk Service │ │ Payment Svc  │          (Twilio/SendGrid)         │ VerifyReference
+└──────────────┘ └──────────────┘                                    │
+                                                       ┌────────────┴───────────┐
+                                                       │ Recon Svc ↔ Ledger via │
+                                                       │ gRPC / internal REST   │
+                                                       └────────────────────────┘
 ```
+
+> **Public entry rule**: clients reach the platform only through the API Gateway;
+> every business API listed above is proxied by it. Internal service-to-service
+> traffic uses gRPC or Kafka and is never exposed to the public network.
 
 1. **Synchronous RPC (gRPC over HTTP/2)**:
    * **Usage**: Mission-critical, low-latency financial calls demanding immediate transactional consistency.

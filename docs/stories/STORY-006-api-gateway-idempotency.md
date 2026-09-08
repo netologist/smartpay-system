@@ -32,7 +32,9 @@
    │ Verify signature, expiry, and extract claims (sub, tenant_id, roles).
    ▼
 4. Financial Route Inspection
-   │ Check if target route is a mutating financial path (/api/v1/payments/**, /api/v1/invoices/**).
+   │ Check if target route is a mutating financial path
+   │ (/api/v1/payments/**, /api/v1/invoices/**, /api/v1/epod/**,
+   │  /api/v1/notifications/**, /api/v1/recon/**).
    │ - If yes: Assert Idempotency-Key header is present. If missing, abort with HTTP 400 Bad Request.
    ▼
 5. Request Body Caching & Cryptographic Hashing
