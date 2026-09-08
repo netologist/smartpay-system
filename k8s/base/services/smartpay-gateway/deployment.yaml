@@ -38,6 +38,19 @@ spec:
           envFrom:
             - configMapRef:
                 name: smartpay-common-config
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres.smartpay.svc.cluster.local:5432/smartpay_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: smartpay-db-app-credentials
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartpay-db-app-credentials
+                  key: password
           resources:
             requests:
               cpu: 100m
