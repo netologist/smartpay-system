@@ -40,7 +40,7 @@ spec:
                 name: smartpay-common-config
           env:
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres.smartpay.svc.cluster.local:5432/smartpay_db"
+              value: "jdbc:postgresql://postgres.smartpay.svc.cluster.local:5432/smartpay_db?currentSchema=invoice"
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
