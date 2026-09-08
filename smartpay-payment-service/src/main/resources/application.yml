@@ -32,8 +32,8 @@ management:
 
 smartpay:
   payment:
-    ledger-grpc-host: localhost
-    ledger-grpc-port: 9090
+    ledger-grpc-host: ${LEDGER_GRPC_HOST:localhost}
+    ledger-grpc-port: ${LEDGER_GRPC_PORT:9090}
     outbox:
       poll-batch-size: 25
       poll-interval-ms: 500

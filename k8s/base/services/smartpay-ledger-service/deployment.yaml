@@ -53,6 +53,8 @@ spec:
                 secretKeyRef:
                   name: smartpay-db-app-credentials
                   key: password
+            - name: GRPC_PORT
+              value: "9090"
           resources:
             requests:
               cpu: 200m
